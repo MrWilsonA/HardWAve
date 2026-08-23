@@ -151,8 +151,15 @@ export default function NatureLighting({ dayNight }: NatureLightingProps) {
         intensity={isNight ? 0.35 : 0.65}
       />
 
-      {/* Horizon Depth Fog – Island is crisp, distant mountains and ocean have atmospheric depth */}
-      <fog attach="fog" args={[fogColor, 65, 480]} />
+      {/* Horizon Depth Fog – Crisp during clear days, thick & dense during rain */}
+      <fog
+        attach="fog"
+        args={[
+          fogColor,
+          dayNight.isRaining ? 16 : 65,
+          dayNight.isRaining ? 135 : 480,
+        ]}
+      />
     </>
   );
 }

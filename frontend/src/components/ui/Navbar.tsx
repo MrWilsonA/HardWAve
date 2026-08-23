@@ -12,6 +12,8 @@ import {
   Moon,
   Navigation,
   Sparkles,
+  CloudRain,
+  CloudSun,
 } from "lucide-react";
 import HardWAveLogo from "@/components/ui/HardWAveLogo";
 import SoundController from "@/components/ui/SoundController";
@@ -279,7 +281,28 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
             )}
           </div>
 
-          {/* 3. Sound & BGM Settings Icon Button */}
+          {/* 3. Rain & Weather Toggle Quick Button */}
+          <button
+            onClick={dayNight.toggleRain}
+            className="w-10 h-10 rounded-2xl border flex items-center justify-center transition-all shadow-xl active:scale-90 cursor-pointer"
+            style={{
+              background: dayNight.isRaining
+                ? "linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(3, 105, 161, 0.9))"
+                : THEME.colors.glass.bg,
+              borderColor: dayNight.isRaining ? "#38bdf8" : THEME.colors.glass.border,
+              backdropFilter: THEME.colors.glass.backdropBlur,
+              color: dayNight.isRaining ? "#38bdf8" : "#cbd5e1",
+            }}
+            title={dayNight.isRaining ? "Rain Mode Active (Click for Clear Sky)" : "Make It Rain"}
+          >
+            {dayNight.isRaining ? (
+              <CloudRain className="w-5 h-5 animate-bounce" />
+            ) : (
+              <CloudSun className="w-5 h-5" />
+            )}
+          </button>
+
+          {/* 4. Sound & BGM Settings Icon Button */}
           <SoundController
             isNight={dayNight.isNight}
             speed={speed}
@@ -287,7 +310,7 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
             onToggleRain={dayNight.toggleRain}
           />
 
-          {/* 4. Connect Wallet Button */}
+          {/* 5. Connect Wallet Button */}
           <button
             onClick={toggleConnect}
             className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-xl active:scale-95 group cursor-pointer"

@@ -11,7 +11,7 @@ import {
   Trees,
   Sun,
   Moon,
-  Wind,
+  Sparkles,
   CloudRain,
   CloudSun,
 } from "lucide-react";
@@ -33,26 +33,34 @@ export default function SoundController({
 }: SoundControllerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [bgmVolume, setBgmVolume] = useState(0.22);
-  const [natureVolume, setNatureVolume] = useState(0.28);
-  const [natureEnabled, setNatureEnabled] = useState(true);
+  const [musicVolume, setMusicVolume] = useState(0.25);
+  const [sfxVolume, setSfxVolume] = useState(0.30);
   const [isOpen, setIsOpen] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const natureAudioRef = useRef<HTMLAudioElement | null>(null);
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const natureRef = useRef<HTMLAudioElement | null>(null);
+  const rainyRef = useRef<HTMLAudioElement | null>(null);
 
-  // Initialize HTML5 Audio & Nature Web Audio Engine
+  // Initialize HTML5 Audio Elements & Nature Web Audio Engine
   useEffect(() => {
-    const audio = new Audio("/audio/bgm.wav");
-    audio.loop = true;
-    audio.volume = bgmVolume;
-    audioRef.current = audio;
+    // 1. Music (BGM)
+    const bgm = new Audio("/audio/bgm.wav");
+    bgm.loop = true;
+    bgm.volume = musicVolume;
+    bgmRef.current = bgm;
 
-    const natureTrack = new Audio("/audio/nature.mp3");
-    natureTrack.loop = true;
-    natureTrack.volume = natureVolume;
-    natureAudioRef.current = natureTrack;
+    // 2. Nature SFX Track
+    const nature = new Audio("/audio/nature.mp3");
+    nature.loop = true;
+    nature.volume = sfxVolume;
+    natureRef.current = nature;
+
+    // 3. Rainy SFX Track
+    const rainy = new Audio("/audio/rainy.mp3");
+    rainy.loop = true;
+    rainy.volume = sfxVolume;
+    rainyRef.current = rainy;
 
     const startAudio = () => {
       if (!hasInteracted) {
@@ -60,13 +68,17 @@ export default function SoundController({
         // Start procedural nature audio
         if (natureAudio) {
           natureAudio.init();
-          natureAudio.setVolume(natureVolume);
+          natureAudio.setVolume(sfxVolume);
           natureAudio.update(isNight, speed, isRaining);
         }
 
-        // Start BGM & Nature Audio smoothly
-        audio.play().then(() => setIsPlaying(true)).catch(() => {});
-        natureTrack.play().catch(() => {});
+        // Start BGM & SFX
+        bgm.play().then(() => setIsPlaying(true)).catch(() => {});
+        if (isRaining) {
+          rainy.play().catch(() => {});
+        } else {
+          nature.play().catch(() => {});
+        }
       }
     };
 
@@ -76,49 +88,72 @@ export default function SoundController({
     return () => {
       window.removeEventListener("click", startAudio);
       window.removeEventListener("keydown", startAudio);
-      audio.pause();
-      audio.src = "";
-      natureTrack.pause();
-      natureTrack.src = "";
+      bgm.pause();
+      bgm.src = "";
+      nature.pause();
+      nature.src = "";
+      rainy.pause();
+      rainy.src = "";
       if (natureAudio) natureAudio.destroy();
     };
   }, []);
 
-  // Sync BGM volume & mute
+  // Sync Music Volume & Mute
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : bgmVolume;
+    if (bgmRef.current) {
+      bgmRef.current.volume = isMuted ? 0 : musicVolume;
     }
-  }, [bgmVolume, isMuted]);
+  }, [musicVolume, isMuted]);
 
-  // Sync Nature Track volume & mute
+  // Sync SFX Volume & Weather Audio Switch (Rain vs Nature)
   useEffect(() => {
-    if (natureAudioRef.current) {
-      natureAudioRef.current.volume = isMuted || !natureEnabled ? 0 : natureVolume;
+    const effectiveSfxVol = isMuted ? 0 : sfxVolume;
+
+    if (natureRef.current) {
+      natureRef.current.volume = effectiveSfxVol;
     }
-  }, [natureVolume, isMuted, natureEnabled]);
+    if (rainyRef.current) {
+      rainyRef.current.volume = effectiveSfxVol;
+    }
 
-  // Sync Nature Audio Volume, Day/Night, Rain Weather, and Driving Speed
-  useEffect(() => {
+    // Switch between Rainy Track and Nature Track
+    if (isPlaying && !isMuted) {
+      if (isRaining) {
+        natureRef.current?.pause();
+        rainyRef.current?.play().catch(() => {});
+      } else {
+        rainyRef.current?.pause();
+        natureRef.current?.play().catch(() => {});
+      }
+    } else {
+      natureRef.current?.pause();
+      rainyRef.current?.pause();
+    }
+
     if (natureAudio) {
-      natureAudio.setVolume(isMuted || !natureEnabled ? 0 : natureVolume);
+      natureAudio.setVolume(effectiveSfxVol);
       natureAudio.update(isNight, speed, isRaining);
     }
-  }, [natureVolume, natureEnabled, isMuted, isNight, speed, isRaining]);
+  }, [sfxVolume, isMuted, isRaining, isPlaying, isNight, speed]);
 
   const togglePlay = () => {
-    if (!audioRef.current) return;
+    if (!bgmRef.current) return;
     if (isPlaying) {
-      audioRef.current.pause();
-      if (natureAudioRef.current) natureAudioRef.current.pause();
+      bgmRef.current.pause();
+      natureRef.current?.pause();
+      rainyRef.current?.pause();
       setIsPlaying(false);
     } else {
       if (natureAudio) {
         natureAudio.init();
         natureAudio.resume();
       }
-      if (natureAudioRef.current) natureAudioRef.current.play().catch(() => {});
-      audioRef.current
+      if (isRaining) {
+        rainyRef.current?.play().catch(() => {});
+      } else {
+        natureRef.current?.play().catch(() => {});
+      }
+      bgmRef.current
         .play()
         .then(() => {
           setIsPlaying(true);
@@ -146,11 +181,11 @@ export default function SoundController({
           backdropFilter: THEME.colors.glass.backdropBlur,
           color: isPlaying && !isMuted ? "#4ade80" : "#94a3b8",
         }}
-        title="Music & Nature Sound Settings"
+        title="Audio & Sound Settings"
       >
-        {isMuted || (!isPlaying && !natureEnabled) ? (
+        {isMuted || !isPlaying ? (
           <VolumeX className="w-5 h-5" />
-        ) : bgmVolume > 0.5 || natureVolume > 0.5 ? (
+        ) : musicVolume > 0.5 || sfxVolume > 0.5 ? (
           <Volume2 className="w-5 h-5 animate-pulse" />
         ) : (
           <Volume1 className="w-5 h-5" />
@@ -178,7 +213,7 @@ export default function SoundController({
             <div className="flex items-center gap-2">
               <Trees className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-black uppercase tracking-wider text-white">
-                Audio System
+                Audio Settings
               </span>
             </div>
             <span
@@ -188,7 +223,7 @@ export default function SoundController({
                 color: isPlaying ? "#4ade80" : "#94a3b8",
               }}
             >
-              {isPlaying ? "ACTIVE" : "STANDBY"}
+              {isPlaying ? "PLAYING" : "PAUSED"}
             </span>
           </div>
 
@@ -221,7 +256,7 @@ export default function SoundController({
               <button
                 onClick={togglePlay}
                 className="p-1.5 rounded-xl border transition-all active:scale-95 cursor-pointer bg-white/10 border-white/20 hover:bg-white/20 text-white"
-                title={isPlaying ? "Pause" : "Play"}
+                title={isPlaying ? "Pause Audio" : "Play Audio"}
               >
                 {isPlaying ? <Pause size={12} /> : <Play size={12} />}
               </button>
@@ -239,14 +274,14 @@ export default function SoundController({
             </div>
           </div>
 
-          {/* 2. BGM Volume Slider */}
+          {/* 2. Channel 1: Music (BGM) Volume */}
           <div className="space-y-1">
             <div className="flex justify-between items-center text-[10px] font-mono">
               <span className="text-slate-400 flex items-center gap-1">
-                <Music size={11} className="text-amber-400" /> BGM Volume
+                <Music size={11} className="text-amber-400" /> Music (BGM)
               </span>
               <span className="text-amber-300 font-bold">
-                {isMuted ? "0%" : `${Math.round(bgmVolume * 100)}%`}
+                {isMuted ? "0%" : `${Math.round(musicVolume * 100)}%`}
               </span>
             </div>
             <input
@@ -254,23 +289,23 @@ export default function SoundController({
               min="0"
               max="1"
               step="0.01"
-              value={isMuted ? 0 : bgmVolume}
+              value={isMuted ? 0 : musicVolume}
               onChange={(e) => {
-                setBgmVolume(parseFloat(e.target.value));
+                setMusicVolume(parseFloat(e.target.value));
                 if (isMuted) setIsMuted(false);
               }}
               className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-amber-400 bg-white/10"
             />
           </div>
 
-          {/* 3. Natural Ambience Sound Slider */}
+          {/* 3. Channel 2: SFX (Nature & Rain) Volume */}
           <div className="space-y-1 pt-1">
             <div className="flex justify-between items-center text-[10px] font-mono">
               <span className="text-slate-400 flex items-center gap-1">
-                <Wind size={11} className="text-emerald-400" /> Nature & Rain SFX
+                <Sparkles size={11} className="text-emerald-400" /> SFX (Nature & Rain)
               </span>
               <span className="text-emerald-400 font-bold">
-                {!natureEnabled || isMuted ? "0%" : `${Math.round(natureVolume * 100)}%`}
+                {isMuted ? "0%" : `${Math.round(sfxVolume * 100)}%`}
               </span>
             </div>
             <input
@@ -278,30 +313,29 @@ export default function SoundController({
               min="0"
               max="1"
               step="0.01"
-              value={!natureEnabled || isMuted ? 0 : natureVolume}
+              value={isMuted ? 0 : sfxVolume}
               onChange={(e) => {
-                setNatureVolume(parseFloat(e.target.value));
+                setSfxVolume(parseFloat(e.target.value));
                 if (isMuted) setIsMuted(false);
-                if (!natureEnabled) setNatureEnabled(true);
               }}
               className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-emerald-400 bg-white/10"
             />
           </div>
 
-          {/* 4. Weather Rain Toggle & Status */}
+          {/* 4. Weather Rain Toggle & Ambient Status */}
           <div className="pt-2 border-t border-white/10 flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-300">
               {isRaining ? (
                 <span className="flex items-center gap-1 text-sky-400 font-bold">
-                  <CloudRain size={12} className="animate-bounce" /> Rainy Weather SFX
+                  <CloudRain size={12} className="animate-bounce" /> Rainy Audio
                 </span>
               ) : isNight ? (
                 <span className="flex items-center gap-1 text-indigo-300 font-bold">
-                  <Moon size={12} /> Crickets & Night Breeze
+                  <Moon size={12} /> Night Crickets
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-amber-300 font-bold">
-                  <Sun size={12} /> Birds & Forest Breeze
+                  <Sun size={12} /> Day Birds
                 </span>
               )}
             </div>
@@ -309,7 +343,7 @@ export default function SoundController({
             {onToggleRain && (
               <button
                 onClick={onToggleRain}
-                className="flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-bold border transition-all active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-all active:scale-95 cursor-pointer"
                 style={{
                   background: isRaining
                     ? "linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(3, 105, 161, 0.9))"
@@ -317,10 +351,10 @@ export default function SoundController({
                   borderColor: isRaining ? "#38bdf8" : "rgba(255, 255, 255, 0.15)",
                   color: isRaining ? "#7dd3fc" : "#cbd5e1",
                 }}
-                title={isRaining ? "Stop Rain" : "Make it Rain"}
+                title={isRaining ? "Stop Rain" : "Start Rain"}
               >
-                {isRaining ? <CloudSun size={11} /> : <CloudRain size={11} />}
-                <span>{isRaining ? "Clear" : "Rain"}</span>
+                {isRaining ? <CloudSun size={12} /> : <CloudRain size={12} />}
+                <span>{isRaining ? "Clear Sky" : "Rain Mode"}</span>
               </button>
             )}
           </div>
