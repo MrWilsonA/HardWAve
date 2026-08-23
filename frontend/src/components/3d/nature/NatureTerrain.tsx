@@ -6,16 +6,18 @@ import { useFrame } from "@react-three/fiber";
 import { getTerrainHeight } from "@/utils/terrainPhysics";
 
 /* ───────────────────────────────────────────
-   Pure Radial 360° Island & Infinite Ocean (Zero Z-Fighting & Zero Squares)
+   Pure Radial 360° Island & Infinite Ocean (With Carved East Lake Basin)
    – Green island ground: Pure Circular Subdivided Ring (radius 46.0, y: 0.20)
-   – Connected Road Network: Elevated (y: 0.245) with polygonOffset depth bias (Zero flickering)
+     * Carved Lake Basin: center (14, 0), radius 6.0, basin depth -0.6m
+   – Shimmering East Lake Water: (y: 0.16) with rippling currents and bobbing lily pads
+   – Wooden Bridge across the lake at y: 0.38
+   – Connected Road Network: Elevated (y: 0.245) with polygonOffset depth bias
    – Unified Circular Ocean Disk: (radius 5000, y: 0.02)
-   – Shoreline Beach & East Lake with ripples and bridge
    ─────────────────────────────────────────── */
 
 function GreenIslandGround() {
   const geometry = useMemo(() => {
-    const geo = new THREE.RingGeometry(0.001, 46.0, 64, 48);
+    const geo = new THREE.RingGeometry(0.001, 46.0, 72, 54);
     geo.rotateX(-Math.PI / 2);
 
     const pos = geo.attributes.position;
@@ -23,11 +25,20 @@ function GreenIslandGround() {
       const x = pos.getX(i);
       const z = pos.getZ(i);
       const dist = Math.sqrt(x * x + z * z);
+      const distLake = Math.sqrt((x - 14) ** 2 + z ** 2);
 
-      if (dist <= 43) {
+      // 1. Carve East Lake Basin (center: 14, 0, radius: 6.2)
+      if (distLake < 6.2) {
+        const basin = Math.min(1.0, distLake / 6.2);
+        // Basin drops down to -0.65m in center and slopes up to 0.20m at rim
+        pos.setY(i, -0.65 + basin * 0.85);
+      }
+      // 2. Main flat green island lawn
+      else if (dist <= 43) {
         pos.setY(i, 0.20);
-      } else {
-        // Smoothly slope down under beach sand into ocean bed
+      }
+      // 3. Smooth slope down under beach sand into ocean bed
+      else {
         const slope = (dist - 43) / 3.0;
         pos.setY(i, 0.20 - slope * 0.35);
       }
@@ -144,7 +155,9 @@ function TrueInfiniteOcean() {
   );
 }
 
-/* Lake with Bridge Crossing & Animated Water Current */
+/* ───────────────────────────────────────────
+   East Lake with Bridge Crossing & Flowing Water Currents
+   ─────────────────────────────────────────── */
 function PondsAndBridge() {
   const waterRef = useRef<THREE.Mesh>(null);
   const lilyPadsRef = useRef<THREE.Group>(null);
@@ -152,47 +165,48 @@ function PondsAndBridge() {
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     if (waterRef.current) {
-      waterRef.current.position.y = 0.04 + Math.sin(t * 1.8) * 0.014;
+      // Flowing ripple wave on lake surface
+      waterRef.current.position.y = 0.15 + Math.sin(t * 1.8) * 0.012;
     }
     if (lilyPadsRef.current) {
       lilyPadsRef.current.children.forEach((pad, i) => {
-        pad.position.y = 0.055 + Math.sin(t * 2.0 + i * 1.5) * 0.008;
+        pad.position.y = 0.165 + Math.sin(t * 2.0 + i * 1.5) * 0.008;
       });
     }
   });
 
   return (
     <group>
-      {/* Lake Rim */}
-      <mesh position={[14, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[5.8, 6.5, 32]} />
+      {/* Lake Sand & Cobblestone Rim (center: 14, 0, radius: 6.0) */}
+      <mesh position={[14, 0.19, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[5.6, 6.4, 48]} />
         <meshStandardMaterial color="#d4a373" flatShading roughness={0.9} />
       </mesh>
 
-      {/* Shimmering Blue Lake Water */}
+      {/* Shimmering Blue Lake Water (elevated at y = 0.15 filling the carved basin) */}
       <mesh
         ref={waterRef}
-        position={[14, 0.04, 0]}
+        position={[14, 0.15, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
       >
-        <circleGeometry args={[6.0, 32]} />
+        <circleGeometry args={[6.0, 48]} />
         <meshStandardMaterial
           color="#0284c7"
           transparent
           opacity={0.88}
-          roughness={0.05}
-          metalness={0.4}
+          roughness={0.04}
+          metalness={0.45}
           flatShading
         />
       </mesh>
 
-      {/* Floating Lily Pads */}
+      {/* Floating Lily Pads bobbing with current */}
       <group ref={lilyPadsRef}>
         {[
-          [11.5, 0.06, -3.5],
-          [16.5, 0.06, -3.2],
-          [12.0, 0.06, 3.6],
-          [16.0, 0.06, 3.4],
+          [11.5, 0.165, -3.5],
+          [16.5, 0.165, -3.2],
+          [12.0, 0.165, 3.6],
+          [16.0, 0.165, 3.4],
         ].map((pos, i) => (
           <mesh key={i} position={pos as [number, number, number]} rotation={[-Math.PI / 2, 0, i * 1.4]}>
             <circleGeometry args={[0.55, 6]} />
@@ -201,28 +215,33 @@ function PondsAndBridge() {
         ))}
       </group>
 
-      {/* Wooden Bridge (x: 10 to 18, z: 0) */}
+      {/* ── Wooden Bridge directly on East Road (x: 9.5 to 18.5, z: 0) ── */}
       <group position={[14, 0.38, 0]}>
+        {/* Main Deck Planks running East-West */}
         <mesh receiveShadow castShadow>
-          <boxGeometry args={[8.5, 0.16, 3.4]} />
+          <boxGeometry args={[9.0, 0.16, 3.6]} />
           <meshStandardMaterial color="#78350f" roughness={0.8} flatShading />
         </mesh>
-        <mesh position={[0, 0.45, -1.6]} castShadow>
-          <boxGeometry args={[8.5, 0.7, 0.1]} />
+        {/* North Handrail */}
+        <mesh position={[0, 0.48, -1.7]} castShadow>
+          <boxGeometry args={[9.0, 0.75, 0.12]} />
           <meshStandardMaterial color="#92400e" roughness={0.8} flatShading />
         </mesh>
-        <mesh position={[0, 0.45, 1.6]} castShadow>
-          <boxGeometry args={[8.5, 0.7, 0.1]} />
+        {/* South Handrail */}
+        <mesh position={[0, 0.48, 1.7]} castShadow>
+          <boxGeometry args={[9.0, 0.75, 0.12]} />
           <meshStandardMaterial color="#92400e" roughness={0.8} flatShading />
         </mesh>
-        {[-3, 0, 3].map((px, i) => (
+
+        {/* Underwater Wooden Pilings */}
+        {[-3.2, 0, 3.2].map((px, i) => (
           <group key={i} position={[px, -0.6, 0]}>
-            <mesh position={[0, 0, -1.4]} castShadow>
-              <cylinderGeometry args={[0.12, 0.14, 1.2, 6]} />
+            <mesh position={[0, 0, -1.5]} castShadow>
+              <cylinderGeometry args={[0.14, 0.16, 1.4, 6]} />
               <meshStandardMaterial color="#451a03" flatShading />
             </mesh>
-            <mesh position={[0, 0, 1.4]} castShadow>
-              <cylinderGeometry args={[0.12, 0.14, 1.2, 6]} />
+            <mesh position={[0, 0, 1.5]} castShadow>
+              <cylinderGeometry args={[0.14, 0.16, 1.4, 6]} />
               <meshStandardMaterial color="#451a03" flatShading />
             </mesh>
           </group>
@@ -234,13 +253,11 @@ function PondsAndBridge() {
 
 /* ───────────────────────────────────────────
    Elevated Solid Road Network (Zero Z-Fighting / Zero Flickering)
-   – Distinct elevation (y: 0.245) above green ground (y: 0.20)
-   – Three.js polygonOffset depth biasing ensures clean rasterization
    ─────────────────────────────────────────── */
 function ConnectedRoadNetwork({ lampMultiplier = 1 }: { lampMultiplier?: number }) {
   return (
     <group position={[0, 0.245, 0]}>
-      {/* 1. Grand Ring Road Boulevard (Elevated & Offset) */}
+      {/* 1. Grand Ring Road Boulevard */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <ringGeometry args={[22, 28, 64]} />
         <meshStandardMaterial
@@ -253,7 +270,7 @@ function ConnectedRoadNetwork({ lampMultiplier = 1 }: { lampMultiplier?: number 
         />
       </mesh>
 
-      {/* Neon Border Lines (Elevated +0.008 above road with higher offset) */}
+      {/* Neon Border Lines */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]}>
         <ringGeometry args={[23.2, 23.5, 64]} />
         <meshStandardMaterial
