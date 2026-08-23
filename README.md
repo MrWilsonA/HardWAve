@@ -2,18 +2,18 @@
 
 # ⚡ HardWAve
 
-**Decentralized Hardware Authenticity, Warranty Provenance & 3D Interactive Inspection System**
+**Decentralized Hardware Authenticity, Autonomous Blockchain & 3D Interactive Open-World Provenance System**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Next.js](https://img.shields.io/badge/Next.js-16.x-black?logo=next.js)](https://nextjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-R3F-black?logo=threedotjs)](https://threejs.org/)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-363636?logo=solidity)](https://soliditylang.org/)
-[![Hardhat](https://img.shields.io/badge/Hardhat-2.22.x-yellow?logo=hardhat)](https://hardhat.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://www.docker.com/)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind-CSS-38bdf8?logo=tailwind-css)](https://tailwindcss.com/)
 
-An end-to-end Web3 provenance platform that eliminates counterfeit electronic components and unauthorized aftermarket repairs in high-value hardware (such as GPUs, motherboards, SSDs, and laptops).
+An end-to-end Web3 provenance and digital twin ecosystem that combines an **arcade buggy driving open-world**, an **interactive 3D exploded hardware inspector**, an **autonomous sovereign blockchain engine with live DAG graph visualization**, and a **self-contained hardware NFT marketplace**.
 
-[Features](#-key-features) • [Architecture](#-architecture) • [Tech Stack](#-tech-stack) • [Quickstart](#-quickstart) • [3D Asset Setup](#-3d-model-assets)
+[Features](#-key-features) • [Open-World Park](#-open-world-park--stations) • [Blockchain Architecture](#-blockchain-architecture--dag-graph) • [Tech Stack](#-tech-stack) • [Quickstart & Docker](#-quickstart--docker) • [Controls](#-controls--navigation)
 
 ---
 
@@ -21,37 +21,58 @@ An end-to-end Web3 provenance platform that eliminates counterfeit electronic co
 
 ## 🌟 Key Features
 
-- **🌐 Interactive 3D Digital Twins:** Inspect hardware in real-time using Three.js & React Three Fiber. Rotate, zoom, and explode components into sub-meshes (Cooling Fans, Shroud, Heatsink, VRM, VRAM, and PCB).
-- **🔒 On-Chain Hardware Provenance (ERC-721):** Every physical device is tied to an immutable token minted by authorized manufacturers containing factory specs and serial numbers.
-- **🛠️ Role-Based Service & Repair Registry:** Authorized service centers append tamper-proof repair logs with cryptographic signatures and IPFS diagnostic evidence hashes.
-- **🎨 Dynamic Shader Alerts:** Sub-components with pristine factory status render in neutral/metallic finishes, while replaced or repaired parts glow in amber/red alert states.
-- **📱 QR & Barcode Hardware Scanner:** Instant scanning of serial barcodes on physical device chassis routing straight to the corresponding 3D digital twin.
+### 1. 🏎️ 3D Open-World Island & Arcade Buggy Simulation
+* **Interactive Exploration:** Drive a red buggy across an aesthetic nature island featuring a Grand Oak World Tree centerpiece, central rotary, stone bridges, and 3,600+ dense volumetric grass tufts.
+* **Living Dynamic World:** 10-minute real-time day/night lighting cycle, atmospheric rain storms with dense volumetric fog, and particle ripples.
+* **Smooth Adaptive Audio:** Dual-channel audio system with velocity-modulated engine acceleration (`drive.mp3`), rainstorm ambient crossfade (`rainy.mp3`), and isekai exploration OST.
+
+### 2. 🔬 Interactive 3D Exploded Hardware Inspection (Digital Twin)
+* **Exploded Assembly Slider (0–100%):** Smoothly expand hardware models (e.g. RTX 3090) into isolated sub-components (Backplate, PCB, GA102 Silicon Die, 24GB GDDR6X VRAM, 18-Phase VRM, Copper Heatpipes, Triple Axial Fans, and Outer Shroud).
+* **Dynamic Shader Alert System:** Original factory parts render in sleek metallic finishes, while repaired/aftermarket parts (e.g., replaced cooling fans) illuminate in amber/red alert states.
+* **Component Raycasting:** Click any 3D submesh to view instant on-chain diagnostic history and IPFS attestation hashes.
+
+### 3. 🌐 Sovereign Blockchain Engine & Live DAG Graph Explorer
+* **Autonomous In-Browser EVM Simulation & Real EVM Contracts:** Generates SHA-256 cryptographic block headers (`Block Hash`, `Previous Hash`, `Merkle Root`, `Nonce`, `Gas Used`, `Timestamp`).
+* **Visual 3D/2D Blockchain Node Graph:** Interactive cyber node chain connected by glowing laser links. Click any block (`#0 Genesis`, `#1 Mint`, `#2 Service`, `#N Purchase`) to inspect raw headers and transaction payloads.
+* **Consensus Mining:** Mine new blocks on-demand or trigger automatic block creation when transactions execute.
+
+### 4. 🛒 Autonomous Hardware Marketplace & Ownership Transfer
+* **Self-Contained Economy:** Purchase tokenized hardware (RTX 3090, NZXT Motherboard, Samsung SSD, Kingston RAM, RGB Fan) using virtual wallet funds (`ETH` & `HWAVE`).
+* **Instant On-Chain Transfer:** Deducts balance, mines a new transaction block on the sovereign chain, and transfers ERC-721 ownership directly to the buyer's wallet.
+* **My Hardware Inventory:** Track certified ownership badges and warranty certificates in real-time.
+
+### 5. 📱 QR & Barcode Hardware Scanner
+* Built-in webcam viewfinder and serial number resolver for physical device chassis scanning, instantly routing to the corresponding 3D digital twin.
 
 ---
 
-## 🏛️ Architecture
+## 🏛️ Open-World Park & Stations
+
+| Station | Location | Model | Interactive Experience |
+| :--- | :--- | :--- | :--- |
+| **GPU Inspection Lab** | `[-16, -16]` (SW) | RTX 3090 | 3D Exploded Assembly, Sub-mesh Diagnostics, Alert Shaders |
+| **Blockchain Vault** | `[20, -16]` (SE) | Samsung 980 SSD | Live DAG Block Graph Explorer, Genesis Minting Portal |
+| **Service Workshop** | `[-18, 18]` (NW) | RGB Cooling Fan | Authorized Technician Maintenance Logger & IPFS Proofs |
+| **QR Scanner Gate** | `[0, -25]` (South Gate) | Kingston RAM | Live Webcam & Barcode Scanner, Serial Resolver |
+| **Hardware Showroom** | `[22, 18]` (NE) | NZXT Z490 Board | Multi-Component Hardware Gallery & Marketplace Kiosk |
+
+---
+
+## ⛓️ Blockchain Architecture & DAG Graph
 
 ```mermaid
-flowchart TD
-    subgraph Manufacturer ["🏭 Manufacturer"]
-        M1["Register Serial & Specs"] --> M2["Upload Metadata to IPFS"]
-        M2 --> M3["Mint ERC-721 Hardware Token"]
+flowchart LR
+    subgraph SovereignChain ["🌐 Sovereign HardWAve Blockchain Engine"]
+        B0["Block #0 (Genesis)\nHash: 0x00008f1b..."] --> B1["Block #1 (Factory Mint)\nRTX 3090 Genesis Token"]
+        B1 --> B2["Block #2 (Service Log)\nFan Replacement • IPFS: Qm..."]
+        B2 --> B3["Block #3 (Autonomous Buy)\nOwner: 0x71C8...Demo"]
+        B3 --> BN["Block #N (Consensus Mining)"]
     end
 
-    subgraph Blockchain ["⛓️ EVM Smart Contract (HardWAveHardwareToken)"]
-        M3 --> SC["HardWAve Token & Repair Registry"]
-        S2["Append Repair Log"] --> SC
-    end
-
-    subgraph ServiceCenter ["🔧 Authorized Service Center"]
-        S1["Verify Hardware via QR Scan"] --> S2
-        S2 --> S3["Upload Invoice & Diagnostic to IPFS"]
-    end
-
-    subgraph Consumer ["🔍 Second-Hand Buyer / Consumer"]
-        C1["Scan QR / Enter Serial"] --> C2["Fetch On-Chain History"]
-        C2 --> C3["Interactive 3D Digital Twin Viewer"]
-        C3 --> C4["Inspect Highlighted Repaired Parts"]
+    subgraph Actions ["⚡ On-Chain User Actions"]
+        M1["Genesis Mint Portal"] -.-> B1
+        S1["Service Workshop"] -.-> B2
+        P1["Marketplace Purchase"] -.-> B3
     end
 ```
 
@@ -61,109 +82,61 @@ flowchart TD
 
 | Layer | Technology |
 | :--- | :--- |
-| **Blockchain** | Solidity `^0.8.24`, Hardhat, OpenZeppelin Contracts (`ERC721URIStorage`, `AccessControl`, `Pausable`) |
-| **Frontend Framework** | Next.js (App Router, TypeScript), Tailwind CSS, Lucide Icons |
-| **3D Graphics Engine** | Three.js, React Three Fiber (`@react-three/fiber`), Drei (`@react-three/drei`) |
+| **Frontend Framework** | Next.js 16 (App Router, Turbopack, TypeScript), Tailwind CSS |
+| **3D Graphics & Physics Engine** | Three.js, React Three Fiber (`@react-three/fiber`), Drei (`@react-three/drei`) |
+| **State & Blockchain Engine** | Zustand (`zustand/persist`), Custom SHA-256 Sovereign DAG Engine |
+| **Smart Contracts** | Solidity `^0.8.24`, Hardhat, OpenZeppelin Contracts (`ERC-721`, `AccessControl`) |
 | **Web3 Client** | Wagmi, Viem, Ethers.js v6 |
+| **Containerization** | Docker, Docker Compose, Alpine Linux |
 | **Decentralized Storage** | IPFS (Pinata SDK) |
 
 ---
 
-## 📁 Repository Structure
+## 🚀 Quickstart & Docker
 
-```text
-HardWAve/
-├── contracts/                  # Blockchain Layer (Hardhat & Solidity)
-│   ├── contracts/
-│   │   └── HardWAveHardwareToken.sol  # ERC-721 Token + Role-Based Repair Registry
-│   ├── scripts/
-│   │   └── deploy.ts           # Smart contract deployment script
-│   ├── test/
-│   │   └── HardWAveToken.test.ts # Hardhat unit tests
-│   └── hardhat.config.ts       # Hardhat configuration (Cancun EVM, Sepolia / Amoy)
-│
-├── frontend/                   # Frontend Web App & 3D Viewer (Next.js)
-│   ├── public/
-│   │   └── models/             # 3D GLB/GLTF assets for interactive viewer
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── page.tsx        # Splash Landing Page with 3D Looping Hero
-│   │   │   ├── layout.tsx
-│   │   │   └── globals.css
-│   │   ├── components/
-│   │   │   ├── 3d/
-│   │   │   │   └── HeroHardwareCanvas.tsx # Three.js Looping Canvas
-│   │   │   └── ui/
-│   │   │       └── Navbar.tsx  # Web3 Cyberpunk Navbar
-│   └── package.json
-│
-├── Assets/
-│   └── 3D/                     # Raw 3D assets & reference documentation
-├── HardWAve.md                 # System Specification & Architecture Document
-├── package.json                # Root workspace commands
-└── README.md
-```
+### Option A: Running via Docker Compose (Recommended)
 
----
-
-## 🚀 Quickstart
-
-### Prerequisites
-- **Node.js**: `v20.x` or `v22.x`
-- **npm** or **yarn** / **pnpm**
-
-### 1. Clone the Repository
 ```bash
+# Clone repository
 git clone https://github.com/MrWilsonA/HardWAve.git
 cd HardWAve
+
+# Start the full stack (Frontend, Blockchain Node, PostgreSQL)
+docker compose up --build -d
 ```
 
-### Option A: Local Development
+> 🌐 Open **[http://localhost:3001](http://localhost:3001)** (or `http://localhost:3000`) in your browser.
+
+### Option B: Local Node.js Development
 
 ```bash
 # 1. Install dependencies
-npm install --prefix contracts
-npm install --prefix frontend
+cd frontend
+npm install
 
-# 2. Run smart contract tests
-npm run test:contracts
-
-# 3. Start Next.js 3D development server
+# 2. Start Next.js development server
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Option B: Docker Compose (All-In-One Containerization) 🐳
-
-Run the entire ecosystem (Next.js Frontend, Local Blockchain EVM Node, and PostgreSQL) with a single command:
-
-```bash
-# Build and run containers in background
-docker compose up -d --build
-
-# View running services
-docker compose ps
-
-# Stop containers
-docker compose down
-```
-- **Frontend App**: `http://localhost:3000`
-- **EVM Blockchain RPC**: `http://localhost:8545`
-- **PostgreSQL Database**: `localhost:5432`
+> 🌐 Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ---
 
-## 🎨 3D Model Assets
+## 🎮 Controls & Navigation
 
-The 3D viewer supports `.glb` and `.gltf` hardware models. Default models are mapped in `frontend/public/models/`:
-- `gpu.glb` — Graphics Card (e.g. Nvidia RTX 3090)
-- `fan.glb` — Animated RGB Cooling Fan
-- `ssd.glb` — M.2 NVMe SSD
-- `motherboard.glb` — Mainboard (e.g. NZXT N7 Z490)
-- `ram.glb` — RAM Module (e.g. HyperX Fury)
+| Action | Control Key | Description |
+| :--- | :--- | :--- |
+| **Drive Forward** | `W` / `↑` | Accelerates the buggy forward with adaptive audio |
+| **Steer Left / Right** | `A` / `D` / `←` `→` | Turns wheels with smooth arcade steering |
+| **Reverse / Brake** | `S` / `↓` | Applies brake and engages reverse gear |
+| **Inspect Station** | `E` / Click Banner | Opens interactive modal when inside a pavilion zone |
+| **Rotate Camera** | `Left Click + Drag` | 360° Orbit inspection around vehicle or hardware |
+| **Zoom Camera** | `Scroll Wheel` | Zoom in / out |
+| **Fast Travel** | `Compass Icon` (HUD) | Instant GPS teleportation to any of the 5 pavilions |
+| **Weather Mode** | `Cloud Icon` (HUD) | 1-Click toggle between Sunny Skies and Dynamic Rain |
 
 ---
 
-## 📄 License
+## 📜 License
 
-This project is licensed under the [MIT License](LICENSE).
+Distributed under the **MIT License**. See `LICENSE` for more information.
