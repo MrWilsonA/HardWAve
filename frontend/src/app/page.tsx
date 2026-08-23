@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Sparkles, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette, ToneMapping } from "@react-three/postprocessing";
@@ -25,6 +25,14 @@ import NatureHUD from "@/components/ui/NatureHUD";
 import HardWAveLogo from "@/components/ui/HardWAveLogo";
 import CustomCursor from "@/components/ui/CustomCursor";
 import { useDayNightCycle } from "@/hooks/useDayNightCycle";
+import { useHardwareStore } from "@/store/hardwareStore";
+
+// Web3 & Blockchain Interactive Modals
+import GPUInspectorModal from "@/components/modals/GPUInspectorModal";
+import BlockchainVaultModal from "@/components/modals/BlockchainVaultModal";
+import ServiceWorkshopModal from "@/components/modals/ServiceWorkshopModal";
+import QRScannerModal from "@/components/modals/QRScannerModal";
+import HardwareGalleryModal from "@/components/modals/HardwareGalleryModal";
 
 export default function Home() {
   const [buggyPos, setBuggyPos] = useState(new THREE.Vector3(0, 0.38, 14.0));
@@ -35,6 +43,9 @@ export default function Home() {
 
   // 10-minute real-time day/night cycle
   const dayNight = useDayNightCycle(1.0);
+
+  // Global Hardware Web3 Store
+  const { activeModal, setActiveModal, setActiveUnit, units } = useHardwareStore();
 
   const handlePositionUpdate = useCallback(
     (pos: THREE.Vector3) => {
@@ -61,6 +72,36 @@ export default function Home() {
     }
   }, []);
 
+  // Trigger corresponding modal when interacting with a station
+  const handleStationInteract = useCallback(() => {
+    if (!activeStation) return;
+
+    if (activeStation.id === "gpu_lab") {
+      const gpu = units.find((u) => u.category === "GPU");
+      if (gpu) setActiveUnit(gpu);
+      setActiveModal("gpu_inspector");
+    } else if (activeStation.id === "blockchain_vault") {
+      setActiveModal("vault_mint");
+    } else if (activeStation.id === "service_workshop") {
+      setActiveModal("service_workshop");
+    } else if (activeStation.id === "qr_gate") {
+      setActiveModal("qr_scanner");
+    } else if (activeStation.id === "showroom") {
+      setActiveModal("gallery");
+    }
+  }, [activeStation, setActiveModal, setActiveUnit, units]);
+
+  // Keyboard 'E' / 'e' listener to inspect active station
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === "e" || e.key === "E") && activeStation && !activeModal) {
+        handleStationInteract();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeStation, activeModal, handleStationInteract]);
+
   return (
     <main
       className="w-screen h-screen overflow-hidden relative select-none transition-colors duration-1000"
@@ -79,14 +120,16 @@ export default function Home() {
         speed={speed}
       />
 
-      {/* HUD: Bottom-Left Speedometer, Bottom-Right GPS Radar, Bottom-Center Station Interaction Card */}
+      {/* Dynamic Nature Island HUD: Speedometer, Compass Mini-Map & Interactive Station Card */}
       <NatureHUD
         activeStation={activeStation}
         onTeleport={handleTeleport}
+        onInteract={handleStationInteract}
         speed={speed}
         buggyPos={buggyPos}
       />
 
+      {/* 3D Canvas World */}
       <Canvas
         shadows={{ type: THREE.PCFSoftShadowMap }}
         camera={{ position: [0, 10.5, 15.5], fov: 48, near: 0.5, far: 3500 }}
@@ -113,7 +156,7 @@ export default function Home() {
           {/* Low-Poly Fluffy Drifting Clouds */}
           <LowPolyClouds dayNight={dayNight} />
 
-          {/* Grand Oak Centerpiece Tree */}
+          {/* Majestic Grand Oak Centerpiece Tree */}
           <GrandOak />
 
           {/* 2000+ Dense Wildflower & Grass Meadow with Wind Sway */}
@@ -149,23 +192,24 @@ export default function Home() {
             count={80}
             scale={45}
             size={dayNight.isNight ? 4.5 : 3.0}
-            speed={0.4}
-            opacity={dayNight.isNight ? 0.9 : 0.6}
-            color={dayNight.isNight ? "#67e8f9" : "#fbbf24"}
+            speed={0.5}
+            color={dayNight.isNight ? "#60a5fa" : "#fbbf24"}
+            opacity={dayNight.isNight ? 0.75 : 0.45}
           />
 
-          {/* Soft Ground Contact Shadow */}
+          {/* Soft Ground Contact Ambient Occlusion */}
           <ContactShadows
-            position={[0, -0.05, 0]}
-            opacity={dayNight.isNight ? 0.25 : 0.4}
-            scale={90}
-            blur={2.0}
+            position={[0, 0.22, 0]}
+            opacity={0.35}
+            scale={65}
+            blur={2.4}
             far={10}
-            color={dayNight.isNight ? "#020617" : "#78350f"}
+            resolution={1024}
+            color="#0f172a"
           />
         </Suspense>
 
-        {/* Post-Processing Pipeline */}
+        {/* Cinematic AAA Postprocessing */}
         <EffectComposer multisampling={4}>
           <Bloom
             luminanceThreshold={dayNight.isNight ? 0.5 : 0.75}
@@ -177,6 +221,13 @@ export default function Home() {
           <ToneMapping />
         </EffectComposer>
       </Canvas>
+
+      {/* ── 5 Interactive Web3 & Blockchain Modals ── */}
+      <GPUInspectorModal />
+      <BlockchainVaultModal />
+      <ServiceWorkshopModal />
+      <QRScannerModal />
+      <HardwareGalleryModal />
 
       {/* Intro Loading Overlay – Cyber-Nature Glass */}
       <div

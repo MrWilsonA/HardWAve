@@ -9,6 +9,7 @@ import { THEME } from "@/theme/designSystem";
 interface NatureHUDProps {
   activeStation: StationDef | null;
   onTeleport: (stationId: string) => void;
+  onInteract?: () => void;
   speed?: number;
   buggyPos?: THREE.Vector3;
 }
@@ -16,6 +17,7 @@ interface NatureHUDProps {
 export default function NatureHUD({
   activeStation,
   onTeleport,
+  onInteract,
   speed = 0,
   buggyPos = new THREE.Vector3(0, 0, 0),
 }: NatureHUDProps) {
@@ -207,9 +209,12 @@ export default function NatureHUD({
 
       {/* ── Bottom Center: Station Interactive Banner ── */}
       {activeStation && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div
+          onClick={onInteract}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-4 duration-300 cursor-pointer active:scale-95 transition-transform"
+        >
           <div
-            className="rounded-2xl px-6 py-4 border flex items-center gap-4 shadow-2xl"
+            className="rounded-2xl px-6 py-4 border flex items-center gap-4 shadow-2xl hover:scale-102 transition-all"
             style={{
               background: THEME.colors.glass.bgElevated,
               borderColor: activeStation.color,
