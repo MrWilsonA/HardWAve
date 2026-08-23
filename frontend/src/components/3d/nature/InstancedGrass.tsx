@@ -4,6 +4,7 @@ import React, { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 import { getTerrainHeight, isOnRoad, isInWater } from "@/utils/terrainPhysics";
 import { STATIONS } from "@/components/3d/nature/ParkPavilions";
+import { createRng, WORLD_SEEDS } from "@/utils/rng";
 
 /* ───────────────────────────────────────────
    Dense Lush Grass & Wildflower Meadow
@@ -11,6 +12,13 @@ import { STATIONS } from "@/components/3d/nature/ParkPavilions";
    – Firmly anchored at terrain height + 0.12m (100% visible & stable)
    – Guaranteed full instance distribution (3,500+ tufts)
    ─────────────────────────────────────────── */
+
+interface Instance {
+  position: [number, number, number];
+  scale: number;
+  rotation: number;
+  color: string;
+}
 
 function isValidLawnPosition(x: number, z: number): boolean {
   const dist = Math.sqrt(x * x + z * z);
@@ -45,7 +53,8 @@ export default function InstancedGrass({
 
   // Generate dense grass instances strictly on lawn
   const grassInstances = useMemo(() => {
-    const temp: { position: [number, number, number]; scale: number; rotation: number; color: string }[] = [];
+    const rng = createRng(WORLD_SEEDS.grass);
+    const temp: Instance[] = [];
     const colors = ["#3f6212", "#4d7c0f", "#65a30d", "#84cc16", "#5b8a14", "#70a83b", "#a3e635"];
     let attempts = 0;
     let placed = 0;
@@ -53,17 +62,17 @@ export default function InstancedGrass({
 
     while (placed < grassCount && attempts < maxAttempts) {
       attempts++;
-      const radius = 4.2 + Math.sqrt(Math.random()) * 36.8;
-      const angle = Math.random() * Math.PI * 2;
+      const radius = 4.2 + Math.sqrt(rng.next()) * 36.8;
+      const angle = rng.next() * Math.PI * 2;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
 
       if (!isValidLawnPosition(x, z)) continue;
 
       const h = getTerrainHeight(x, z);
-      const scale = 0.85 + Math.random() * 0.65; // Tall, rich lush blades (0.85m - 1.5m)
-      const rotation = Math.random() * Math.PI * 2;
-      const color = colors[Math.floor(Math.random() * colors.length)];
+      const scale = 0.85 + rng.next() * 0.65; // Tall, rich lush blades (0.85m - 1.5m)
+      const rotation = rng.next() * Math.PI * 2;
+      const color = rng.pick(colors);
 
       temp.push({
         position: [x, h + 0.10, z],
@@ -78,7 +87,8 @@ export default function InstancedGrass({
 
   // Generate flower instances strictly on grass lawn
   const flowerInstances = useMemo(() => {
-    const temp: { position: [number, number, number]; scale: number; rotation: number; color: string }[] = [];
+    const rng = createRng(WORLD_SEEDS.flowers);
+    const temp: Instance[] = [];
     const flowerColors = ["#f43f5e", "#fbbf24", "#38bdf8", "#ec4899", "#a855f7", "#ffffff", "#f97316"];
     let attempts = 0;
     let placed = 0;
@@ -86,17 +96,17 @@ export default function InstancedGrass({
 
     while (placed < flowerCount && attempts < maxAttempts) {
       attempts++;
-      const radius = 4.5 + Math.sqrt(Math.random()) * 36;
-      const angle = Math.random() * Math.PI * 2;
+      const radius = 4.5 + Math.sqrt(rng.next()) * 36;
+      const angle = rng.next() * Math.PI * 2;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
 
       if (!isValidLawnPosition(x, z)) continue;
 
       const h = getTerrainHeight(x, z);
-      const scale = 0.65 + Math.random() * 0.45;
-      const rotation = Math.random() * Math.PI * 2;
-      const color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+      const scale = 0.65 + rng.next() * 0.45;
+      const rotation = rng.next() * Math.PI * 2;
+      const color = rng.pick(flowerColors);
 
       temp.push({
         position: [x, h + 0.14, z],
@@ -115,6 +125,8 @@ export default function InstancedGrass({
   // Firmly set all instance transforms and colors on mount / updates
   useEffect(() => {
     if (grassMeshRef.current) {
+      grassMeshRef.current.frustumCulled = false;
+      grassMeshRef.current.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 120);
       grassInstances.forEach((data, i) => {
         dummy.position.set(...data.position);
         dummy.rotation.set(0, data.rotation, 0);
@@ -130,6 +142,8 @@ export default function InstancedGrass({
     }
 
     if (flowerMeshRef.current) {
+      flowerMeshRef.current.frustumCulled = false;
+      flowerMeshRef.current.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 120);
       flowerInstances.forEach((data, i) => {
         dummy.position.set(...data.position);
         dummy.rotation.set(0, data.rotation, 0);
@@ -188,22 +202,24 @@ export default function InstancedGrass({
 
   return (
     <group>
-      {/* 3,500+ Dense volumetric grass tufts */}
+      {/* 3,500+ Dense volumetric grass tufts – frustum culling disabled so always visible */}
       <instancedMesh
         ref={grassMeshRef}
         args={[grassGeo, undefined, grassInstances.length]}
         castShadow
         receiveShadow
+        frustumCulled={false}
         raycast={() => null}
       >
         <meshStandardMaterial roughness={0.75} metalness={0.02} side={THREE.DoubleSide} />
       </instancedMesh>
 
-      {/* Wildflower blossoms */}
+      {/* Wildflower blossoms – frustum culling disabled */}
       <instancedMesh
         ref={flowerMeshRef}
         args={[flowerGeo, undefined, flowerInstances.length]}
         castShadow
+        frustumCulled={false}
         raycast={() => null}
       >
         <meshStandardMaterial roughness={0.4} metalness={0.08} />

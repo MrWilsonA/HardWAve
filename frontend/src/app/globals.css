@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f0d8b0;
-  --foreground: #3a2a1a;
+  --background: #020617;
+  --foreground: #f8fafc;
+
+  /* Cyber-Nature Earthglass accents, shared with src/theme/designSystem.ts */
+  --brand-emerald: #10b981;
+  --brand-mint: #4ade80;
+  --brand-amber: #f59e0b;
+  --brand-gold: #fbbf24;
 }
 
 @theme inline {
@@ -12,33 +18,186 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html,
 body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-  margin: 0;
-  overflow: hidden;
+  /* Inherit the Geist stack loaded in layout.tsx rather than overriding it. */
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* The world canvas owns all gestures; never rubber-band the page. */
+  overscroll-behavior: none;
 }
 
-/* Loading overlay fade-out animation */
-@keyframes fadeOut {
+/* ───────────────────────────────────────────
+   Motion primitives
+   Tailwind v4 ships without `tailwindcss-animate`, so the
+   `animate-in` utilities the UI used were silently inert.
+   These are the real implementations.
+   ─────────────────────────────────────────── */
+
+@keyframes hw-fade-in {
   from {
-    opacity: 1;
+    opacity: 0;
   }
   to {
-    opacity: 0;
-    visibility: hidden;
+    opacity: 1;
   }
 }
 
-/* Smooth animate-in for station popups */
-@keyframes slideInBottom {
+@keyframes hw-zoom-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(20px);
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes hw-slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px);
   }
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes hw-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hw-scanline {
+  from {
+    top: 4%;
+  }
+  to {
+    top: 96%;
+  }
+}
+
+.hw-fade-in {
+  animation: hw-fade-in 200ms ease-out both;
+}
+
+.hw-zoom-in {
+  animation: hw-zoom-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Station banner sits at left-1/2, so its animation carries the -50% offset. */
+.hw-slide-up {
+  animation: hw-slide-up 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hw-popover {
+  animation: hw-slide-down 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hw-scanline {
+  animation: hw-scanline 2.2s ease-in-out infinite alternate;
+}
+
+/* ───────────────────────────────────────────
+   Slim glass scrollbars for the modal panels
+   ─────────────────────────────────────────── */
+
+.hw-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.hw-scroll::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.hw-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hw-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+}
+
+.hw-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* ───────────────────────────────────────────
+   Exploded-assembly range slider
+   ─────────────────────────────────────────── */
+
+.hw-range {
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand-emerald), var(--brand-gold));
+  cursor: pointer;
+  outline: none;
+}
+
+.hw-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 2px solid var(--brand-emerald);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+  transition: transform 120ms ease;
+}
+
+.hw-range::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.hw-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 2px solid var(--brand-emerald);
+}
+
+.hw-range:focus-visible {
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.35);
+}
+
+/* Visible keyboard focus everywhere, without a ring on mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--brand-mint);
+  outline-offset: 2px;
+}
+
+/* ───────────────────────────────────────────
+   Reduced motion
+   The world keeps rendering; only decorative
+   DOM animation is stripped back.
+   ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

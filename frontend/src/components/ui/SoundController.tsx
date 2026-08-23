@@ -17,20 +17,23 @@ import {
 } from "lucide-react";
 import { THEME } from "@/theme/designSystem";
 import { natureAudio } from "@/utils/natureAudio";
+import { useWorldTelemetry } from "@/store/worldTelemetry";
 
 interface SoundControllerProps {
   isNight?: boolean;
-  speed?: number;
   isRaining?: boolean;
   onToggleRain?: () => void;
 }
 
 export default function SoundController({
   isNight = false,
-  speed = 0,
   isRaining = false,
   onToggleRain,
 }: SoundControllerProps) {
+  // Read the buggy speed straight from telemetry so the parent header does not
+  // have to re-render just to forward it.
+  const speed = useWorldTelemetry((s) => s.speed);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [musicVolume, setMusicVolume] = useState(0.25);
@@ -42,59 +45,65 @@ export default function SoundController({
   const natureRef = useRef<HTMLAudioElement | null>(null);
   const rainyRef = useRef<HTMLAudioElement | null>(null);
 
-  // Initialize HTML5 Audio Elements & Nature Web Audio Engine
+  // Latest scene state, read by the one-shot bootstrap below without making it
+  // a dependency (re-running it would tear down and re-create every element).
+  const latest = useRef({ isNight, isRaining, speed, musicVolume, sfxVolume });
   useEffect(() => {
-    // 1. Music (BGM)
-    const bgm = new Audio("/audio/bgm.wav");
-    bgm.loop = true;
-    bgm.volume = musicVolume;
-    bgmRef.current = bgm;
+    latest.current = { isNight, isRaining, speed, musicVolume, sfxVolume };
+  }, [isNight, isRaining, speed, musicVolume, sfxVolume]);
 
-    // 2. Nature SFX Track
-    const nature = new Audio("/audio/nature.mp3");
-    nature.loop = true;
-    nature.volume = sfxVolume;
-    natureRef.current = nature;
-
-    // 3. Rainy SFX Track
-    const rainy = new Audio("/audio/rainy.mp3");
-    rainy.loop = true;
-    rainy.volume = sfxVolume;
-    rainyRef.current = rainy;
-
-    const startAudio = () => {
-      if (!hasInteracted) {
-        setHasInteracted(true);
-        // Start procedural nature audio
-        if (natureAudio) {
-          natureAudio.init();
-          natureAudio.setVolume(sfxVolume);
-          natureAudio.update(isNight, speed, isRaining);
-        }
-
-        // Start BGM & SFX
-        bgm.play().then(() => setIsPlaying(true)).catch(() => {});
-        if (isRaining) {
-          rainy.play().catch(() => {});
-        } else {
-          nature.play().catch(() => {});
-        }
-      }
+  // Initialise the HTML5 audio elements & procedural nature engine once.
+  useEffect(() => {
+    /**
+     * `preload: none` matters: the BGM track is a multi-megabyte WAV, and the
+     * browser default ("auto") downloaded all of it on first paint even for
+     * visitors who never turn the sound on. Playback still streams on demand.
+     */
+    const createTrack = (src: string, volume: number) => {
+      const el = new Audio();
+      el.preload = "none";
+      el.loop = true;
+      el.volume = volume;
+      el.src = src;
+      return el;
     };
 
-    window.addEventListener("click", startAudio, { once: true });
+    const bgm = createTrack("/audio/bgm.wav", latest.current.musicVolume);
+    const nature = createTrack("/audio/nature.mp3", latest.current.sfxVolume);
+    const rainy = createTrack("/audio/rainy.mp3", latest.current.sfxVolume);
+
+    bgmRef.current = bgm;
+    natureRef.current = nature;
+    rainyRef.current = rainy;
+
+    // Browsers block audio until a real gesture; this is that gesture.
+    const startAudio = () => {
+      setHasInteracted(true);
+      const { isNight: night, isRaining: raining, speed: spd, sfxVolume: sfx } = latest.current;
+
+      natureAudio?.init();
+      natureAudio?.setVolume(sfx);
+      natureAudio?.update(night, spd, raining);
+
+      bgm
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {});
+      (raining ? rainy : nature).play().catch(() => {});
+    };
+
+    window.addEventListener("pointerdown", startAudio, { once: true });
     window.addEventListener("keydown", startAudio, { once: true });
 
     return () => {
-      window.removeEventListener("click", startAudio);
+      window.removeEventListener("pointerdown", startAudio);
       window.removeEventListener("keydown", startAudio);
-      bgm.pause();
-      bgm.src = "";
-      nature.pause();
-      nature.src = "";
-      rainy.pause();
-      rainy.src = "";
-      if (natureAudio) natureAudio.destroy();
+      for (const el of [bgm, nature, rainy]) {
+        el.pause();
+        el.removeAttribute("src");
+        el.load();
+      }
+      natureAudio?.destroy();
     };
   }, []);
 
@@ -159,7 +168,7 @@ export default function SoundController({
           setIsPlaying(true);
           if (isMuted) setIsMuted(false);
         })
-        .catch((e) => console.error("Audio playback error:", e));
+        .catch(() => {});
     }
   };
 
@@ -200,7 +209,7 @@ export default function SoundController({
       {/* Sound Settings Popover */}
       {isOpen && (
         <div
-          className="absolute top-12 right-0 w-[275px] p-4 rounded-3xl border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 select-none space-y-3.5"
+          className="absolute top-12 right-0 w-[275px] p-4 rounded-3xl border shadow-2xl hw-popover z-50 select-none space-y-3.5"
           style={{
             background: THEME.colors.glass.bgElevated,
             borderColor: THEME.colors.glass.border,
@@ -223,7 +232,7 @@ export default function SoundController({
                 color: isPlaying ? "#4ade80" : "#94a3b8",
               }}
             >
-              {isPlaying ? "PLAYING" : "PAUSED"}
+              {isPlaying ? "PLAYING" : hasInteracted ? "PAUSED" : "TAP TO START"}
             </span>
           </div>
 

@@ -23,7 +23,6 @@ export default function NatureLighting({ dayNight }: NatureLightingProps) {
     sunIntensity,
     ambientIntensity,
     ambientColor,
-    fogColor,
     skyRayleigh,
     skyTurbidity,
   } = dayNight;

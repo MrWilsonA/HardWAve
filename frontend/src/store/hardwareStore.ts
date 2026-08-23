@@ -172,14 +172,30 @@ const INITIAL_HARDWARE_UNITS: HardwareUnit[] = [
   },
 ];
 
+/** GLTF digital twin shown for each hardware category. */
+const CATEGORY_MODEL_PATHS: Record<HardwareUnit["category"], string> = {
+  GPU: "/models/gpu.glb",
+  SSD: "/models/ssd.glb",
+  RAM: "/models/ram.glb",
+  Motherboard: "/models/motherboard.glb",
+  Cooling: "/models/fan.glb",
+};
+
+export type ModalId =
+  | "gpu_inspector"
+  | "vault_mint"
+  | "service_workshop"
+  | "qr_scanner"
+  | "gallery";
+
 interface HardwareStoreState {
   units: HardwareUnit[];
   activeUnit: HardwareUnit | null;
-  activeModal: "gpu_inspector" | "vault_mint" | "service_workshop" | "qr_scanner" | "gallery" | null;
+  activeModal: ModalId | null;
   inspectedSubmesh: string | null;
 
   // Actions
-  setActiveModal: (modal: "gpu_inspector" | "vault_mint" | "service_workshop" | "qr_scanner" | "gallery" | null) => void;
+  setActiveModal: (modal: ModalId | null) => void;
   setActiveUnit: (unit: HardwareUnit | null) => void;
   setInspectedSubmesh: (submesh: string | null) => void;
   getUnitBySerial: (serial: string) => HardwareUnit | undefined;
@@ -219,14 +235,13 @@ export const useHardwareStore = create<HardwareStoreState>()(
       },
 
       registerHardware: (serial, modelName, category, specs, warrantyMonths = 36) => {
-        const newId = get().units.length + 1;
-        const randomHash = "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-        
-        let modelPath = "/models/gpu.glb";
-        if (category === "SSD") modelPath = "/models/ssd.glb";
-        if (category === "RAM") modelPath = "/models/ram.glb";
-        if (category === "Motherboard") modelPath = "/models/motherboard.glb";
-        if (category === "Cooling") modelPath = "/models/fan.glb";
+        const units = get().units;
+        // Always advance past the highest id: length-based ids collide once a
+        // unit has been minted and the registry re-ordered.
+        const newId = units.reduce((max, u) => Math.max(max, u.tokenId), 0) + 1;
+        const randomHash =
+          "0x" +
+          Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
 
         const newUnit: HardwareUnit = {
           tokenId: newId,
@@ -238,7 +253,7 @@ export const useHardwareStore = create<HardwareStoreState>()(
           manufactureDate: Date.now(),
           warrantyMonths,
           isGenuine: true,
-          modelPath,
+          modelPath: CATEGORY_MODEL_PATHS[category],
           specs,
           repairHistory: [],
           txHash: randomHash,
@@ -258,7 +273,7 @@ export const useHardwareStore = create<HardwareStoreState>()(
 
         const newRepair: RepairRecord = {
           ...repair,
-          repairId: unit.repairHistory.length + 1,
+          repairId: unit.repairHistory.reduce((max, r) => Math.max(max, r.repairId), 0) + 1,
           timestamp: Date.now(),
         };
 
@@ -283,6 +298,8 @@ export const useHardwareStore = create<HardwareStoreState>()(
     }),
     {
       name: "hardwave-hardware-registry",
+      // Only the registry itself is durable; which modal was open is not.
+      partialize: (state) => ({ units: state.units }),
     }
   )
 );

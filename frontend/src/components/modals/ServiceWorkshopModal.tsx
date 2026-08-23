@@ -6,19 +6,24 @@ import {
   Wrench,
   ShieldAlert,
   UploadCloud,
-  FileCheck,
   CheckCircle2,
   AlertTriangle,
-  FileText,
   Sparkles,
-  Cpu,
   UserCheck,
 } from "lucide-react";
 import { THEME } from "@/theme/designSystem";
 import { useHardwareStore } from "@/store/hardwareStore";
+import { useBlockchainEngine, hashString, TECHNICIAN_ADDRESS } from "@/store/blockchainEngine";
+
+const SERVICE_CENTER = "CyberService Authorized Hub #04";
 
 export default function ServiceWorkshopModal() {
-  const { activeModal, setActiveModal, units, logRepair, setActiveUnit } = useHardwareStore();
+  const activeModal = useHardwareStore((s) => s.activeModal);
+  const setActiveModal = useHardwareStore((s) => s.setActiveModal);
+  const units = useHardwareStore((s) => s.units);
+  const logRepair = useHardwareStore((s) => s.logRepair);
+  const setActiveUnit = useHardwareStore((s) => s.setActiveUnit);
+  const addTransactionAndMine = useBlockchainEngine((s) => s.addTransactionAndMine);
 
   const [selectedSerial, setSelectedSerial] = useState(units[0]?.serialNumber || "");
   const [componentName, setComponentName] = useState("cooling_fan");
@@ -43,34 +48,54 @@ export default function ServiceWorkshopModal() {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const randomIpfsHash =
-        "Qm" +
-        Array.from({ length: 44 }, () =>
-          "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".charAt(
-            Math.floor(Math.random() * 58)
-          )
-        ).join("");
+    window.setTimeout(() => {
+      // The CID stands in for a real pin, but it is a genuine SHA-256 digest of
+      // the attestation payload, so the evidence hash is verifiable, not random.
+      const digest = hashString(
+        [selectedSerial, componentName, actionDescription, fileName, Date.now()].join("|")
+      );
+      const ipfsEvidenceHash = `Qm${digest.slice(2, 46)}`;
 
       logRepair(selectedSerial, {
         componentName,
         componentLabel,
         actionDescription,
         isReplaced,
-        ipfsEvidenceHash: randomIpfsHash,
+        ipfsEvidenceHash,
         ipfsFileName: fileName,
-        technician: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC (Master Tech)",
-        serviceCenter: "CyberService Authorized Hub #04",
+        technician: `${TECHNICIAN_ADDRESS} (Master Tech)`,
+        serviceCenter: SERVICE_CENTER,
         costUSD,
+      });
+
+      // A maintenance record is only trustworthy once it is anchored on-chain.
+      const unit = units.find((u) => u.serialNumber === selectedSerial);
+      addTransactionAndMine({
+        type: "SERVICE",
+        from: TECHNICIAN_ADDRESS,
+        to: unit?.manufacturerAddress ?? TECHNICIAN_ADDRESS,
+        tokenId: unit?.tokenId,
+        serialNumber: selectedSerial,
+        hardwareName: unit?.modelName,
+        amountETH: 0,
+        details: `${isReplaced ? "Part Replaced" : "Part Serviced"}: ${componentLabel} - IPFS ${ipfsEvidenceHash.slice(0, 14)}...`,
       });
 
       setIsSubmitting(false);
       setSubmitSuccess(true);
-    }, 1200);
+    }, 1000);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-2xl animate-in fade-in duration-200 select-none">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-2xl hw-fade-in select-none"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Authorized service center hub"
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) setActiveModal(null);
+      }}
+    >
       <div
         className="w-full max-w-5xl h-[88vh] rounded-3xl border flex flex-col overflow-hidden shadow-2xl relative"
         style={{
@@ -101,6 +126,7 @@ export default function ServiceWorkshopModal() {
 
           <button
             onClick={() => setActiveModal(null)}
+            aria-label="Close service workshop"
             className="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
           >
             <X size={20} />
@@ -110,7 +136,7 @@ export default function ServiceWorkshopModal() {
         {/* Body */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Left Form */}
-          <div className="flex-1 p-6 overflow-y-auto border-r border-white/10 space-y-5">
+          <div className="flex-1 p-6 overflow-y-auto hw-scroll border-r border-white/10 space-y-5">
             <div>
               <h3 className="text-sm font-bold text-white">Log Hardware Maintenance Record</h3>
               <p className="text-xs text-slate-400">
@@ -119,7 +145,7 @@ export default function ServiceWorkshopModal() {
             </div>
 
             {submitSuccess && (
-              <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-between text-emerald-300 text-xs animate-in zoom-in-95">
+              <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-between text-emerald-300 text-xs hw-zoom-in">
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 size={18} className="text-emerald-400" />
                   <div>
@@ -149,7 +175,10 @@ export default function ServiceWorkshopModal() {
                 </label>
                 <select
                   value={selectedSerial}
-                  onChange={(e) => setSelectedSerial(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedSerial(e.target.value);
+                    setSubmitSuccess(false);
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-mono focus:border-amber-400 focus:outline-none"
                 >
                   {units.map((u) => (
@@ -254,11 +283,30 @@ export default function ServiceWorkshopModal() {
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
+                    aria-label="IPFS attachment file name"
                     value={fileName}
                     onChange={(e) => setFileName(e.target.value)}
                     className="flex-1 px-3 py-1.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-mono"
                   />
-                  <span className="text-[10px] text-slate-400 font-mono">Auto-SHA256</span>
+                  <span className="text-[10px] text-slate-400 font-mono shrink-0">Auto-SHA256</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label
+                    className="text-[11px] text-slate-400 font-bold shrink-0"
+                    htmlFor="service-cost"
+                  >
+                    Service Cost (USD)
+                  </label>
+                  <input
+                    id="service-cost"
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={costUSD}
+                    onChange={(e) => setCostUSD(parseFloat(e.target.value) || 0)}
+                    className="flex-1 px-3 py-1.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-mono"
+                  />
                 </div>
               </div>
 
@@ -270,7 +318,7 @@ export default function ServiceWorkshopModal() {
                 {isSubmitting ? (
                   <>
                     <Sparkles className="animate-spin" size={16} />
-                    <span>Signing Transaction to Polygon Amoy...</span>
+                    <span>Mining Service Block to Sovereign Chain...</span>
                   </>
                 ) : (
                   <>
@@ -283,7 +331,7 @@ export default function ServiceWorkshopModal() {
           </div>
 
           {/* Right Preview: Current Hardware Timeline */}
-          <div className="w-full md:w-[360px] bg-black/40 p-6 flex flex-col overflow-y-auto space-y-4">
+          <div className="w-full md:w-[360px] bg-black/40 p-6 flex flex-col overflow-y-auto hw-scroll space-y-4">
             <div className="border-b border-white/10 pb-3">
               <span className="text-xs font-black uppercase tracking-wider text-white">
                 Selected Unit History

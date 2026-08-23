@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Sparkles, ContactShadows } from "@react-three/drei";
+import { Sparkles, ContactShadows, AdaptiveDpr, Preload } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette, ToneMapping } from "@react-three/postprocessing";
 import * as THREE from "three";
 
@@ -16,122 +16,127 @@ import GrandOak from "@/components/3d/nature/GrandOak";
 import WindParticles from "@/components/3d/nature/WindParticles";
 import RainWeather from "@/components/3d/nature/RainWeather";
 import RedBuggy from "@/components/3d/nature/RedBuggy";
-import ParkPavilions, {
-  STATIONS,
-  StationDef,
-} from "@/components/3d/nature/ParkPavilions";
+import ParkPavilions, { STATIONS } from "@/components/3d/nature/ParkPavilions";
 import Navbar from "@/components/ui/Navbar";
 import NatureHUD from "@/components/ui/NatureHUD";
-import HardWAveLogo from "@/components/ui/HardWAveLogo";
+import IntroOverlay from "@/components/ui/IntroOverlay";
 import CustomCursor from "@/components/ui/CustomCursor";
 import { useDayNightCycle } from "@/hooks/useDayNightCycle";
-import { useHardwareStore } from "@/store/hardwareStore";
+import { useHardwareStore, ModalId } from "@/store/hardwareStore";
+import { useWorldTelemetry } from "@/store/worldTelemetry";
 
-// Web3 & Blockchain Interactive Modals
+// Web3 & blockchain interactive modals
 import GPUInspectorModal from "@/components/modals/GPUInspectorModal";
 import BlockchainVaultModal from "@/components/modals/BlockchainVaultModal";
 import ServiceWorkshopModal from "@/components/modals/ServiceWorkshopModal";
 import QRScannerModal from "@/components/modals/QRScannerModal";
 import HardwareGalleryModal from "@/components/modals/HardwareGalleryModal";
 
+/** Which pavilion opens which Web3 experience. */
+const STATION_MODALS: Record<string, ModalId> = {
+  gpu_lab: "gpu_inspector",
+  blockchain_vault: "vault_mint",
+  service_workshop: "service_workshop",
+  qr_gate: "qr_scanner",
+  showroom: "gallery",
+};
+
 export default function Home() {
-  const [buggyPos, setBuggyPos] = useState(new THREE.Vector3(0, 0.38, 14.0));
-  const [activeStation, setActiveStation] = useState<StationDef | null>(null);
   const [teleportTarget, setTeleportTarget] = useState<THREE.Vector3 | null>(null);
-  const [speed, setSpeed] = useState(0);
-  const [prevPos, setPrevPos] = useState(new THREE.Vector3());
 
   // 10-minute real-time day/night cycle
   const dayNight = useDayNightCycle(1.0);
+  const { lampIntensityMultiplier, isNight, isRaining } = dayNight;
 
-  // Global Hardware Web3 Store
-  const { activeModal, setActiveModal, setActiveUnit, units } = useHardwareStore();
-
-  const handlePositionUpdate = useCallback(
-    (pos: THREE.Vector3) => {
-      setBuggyPos(pos);
-      const dx = pos.x - prevPos.x;
-      const dz = pos.z - prevPos.z;
-      const spd = Math.sqrt(dx * dx + dz * dz) * 60;
-      setSpeed(spd);
-      setPrevPos(pos.clone());
-    },
-    [prevPos]
+  const nearStationId = useWorldTelemetry((s) => s.nearStationId);
+  const activeStation = useMemo(
+    () => STATIONS.find((s) => s.id === nearStationId) ?? null,
+    [nearStationId]
   );
+
+  const { activeModal, setActiveModal, setActiveUnit, units } = useHardwareStore();
 
   const handleTeleport = useCallback((stationId: string) => {
     const station = STATIONS.find((s) => s.id === stationId);
-    if (station) {
-      setTeleportTarget(
-        new THREE.Vector3(
-          station.position[0] + 5.5,
-          0.5,
-          station.position[2] + 5.5
-        )
-      );
-    }
+    if (!station) return;
+    setTeleportTarget(
+      new THREE.Vector3(station.position[0] + 5.5, 0.5, station.position[2] + 5.5)
+    );
   }, []);
 
-  // Trigger corresponding modal when interacting with a station
+  const handleTeleportDone = useCallback(() => setTeleportTarget(null), []);
+
+  // Open the pavilion's corresponding Web3 modal
   const handleStationInteract = useCallback(() => {
     if (!activeStation) return;
 
     if (activeStation.id === "gpu_lab") {
       const gpu = units.find((u) => u.category === "GPU");
       if (gpu) setActiveUnit(gpu);
-      setActiveModal("gpu_inspector");
-    } else if (activeStation.id === "blockchain_vault") {
-      setActiveModal("vault_mint");
-    } else if (activeStation.id === "service_workshop") {
-      setActiveModal("service_workshop");
-    } else if (activeStation.id === "qr_gate") {
-      setActiveModal("qr_scanner");
-    } else if (activeStation.id === "showroom") {
-      setActiveModal("gallery");
     }
+
+    const modal = STATION_MODALS[activeStation.id];
+    if (modal) setActiveModal(modal);
   }, [activeStation, setActiveModal, setActiveUnit, units]);
 
-  // Keyboard 'E' / 'e' listener to inspect active station
+  // 'E' opens the nearby station; 'Escape' closes whatever is open.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && activeModal) {
+        setActiveModal(null);
+        return;
+      }
+      const typing = (e.target as HTMLElement | null)?.tagName;
+      if (typing === "INPUT" || typing === "TEXTAREA" || typing === "SELECT") return;
+
       if ((e.key === "e" || e.key === "E") && activeStation && !activeModal) {
         handleStationInteract();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeStation, activeModal, handleStationInteract]);
+  }, [activeStation, activeModal, handleStationInteract, setActiveModal]);
+
+  // The static island only needs rebuilding when the lamps change brightness,
+  // not on every clock tick, so it is memoized against that single value.
+  const staticWorld = useMemo(
+    () => (
+      <>
+        <NatureTerrain lampMultiplier={lampIntensityMultiplier} />
+        <DistantIslands lampMultiplier={lampIntensityMultiplier} />
+        <GrandOak />
+        <InstancedGrass />
+        <LowPolyProps lampMultiplier={lampIntensityMultiplier} />
+        <ParkPavilions lampMultiplier={lampIntensityMultiplier} />
+      </>
+    ),
+    [lampIntensityMultiplier]
+  );
 
   return (
     <main
       className="w-screen h-screen overflow-hidden relative select-none transition-colors duration-1000"
-      style={{
-        backgroundColor: dayNight.isNight ? "#020617" : "#fde68a",
-      }}
+      style={{ backgroundColor: isNight ? "#020617" : "#fde68a" }}
     >
-      {/* Sleek Custom Indie Metaverse Mouse Cursor */}
+      {/* Sleek custom indie-metaverse cursor */}
       <CustomCursor />
 
-      {/* Top Header: HardWAve Logo + Clock on Left | Minimized Controls, Fast Travel & Wallet on Right */}
-      <Navbar
-        dayNight={dayNight}
-        activeStation={activeStation}
-        onTeleport={handleTeleport}
-        speed={speed}
-      />
+      {/* Header: logo & world clock on the left, controls, fast travel and wallet on the right */}
+      <Navbar dayNight={dayNight} onTeleport={handleTeleport} />
 
-      {/* Dynamic Nature Island HUD: Speedometer, Compass Mini-Map & Interactive Station Card */}
+      {/* Speedometer, GPS radar mini-map and the interactive station card */}
       <NatureHUD
         activeStation={activeStation}
         onTeleport={handleTeleport}
         onInteract={handleStationInteract}
-        speed={speed}
-        buggyPos={buggyPos}
       />
 
-      {/* 3D Canvas World */}
+      {/* 3D canvas world */}
       <Canvas
-        shadows={{ type: THREE.PCFSoftShadowMap }}
+        // three r185 deprecated PCFSoftShadowMap and silently downgrades it to
+        // PCFShadowMap, warning on every shadow recompile. Ask for the real
+        // type directly: identical output, no console spam.
+        shadows="percentage"
         camera={{ position: [0, 10.5, 15.5], fov: 48, near: 0.5, far: 3500 }}
         dpr={[1, 1.5]}
         performance={{ min: 0.5 }}
@@ -139,65 +144,45 @@ export default function Home() {
           antialias: true,
           powerPreference: "high-performance",
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: dayNight.isNight ? 1.4 : 1.25,
+          toneMappingExposure: isNight ? 1.4 : 1.25,
         }}
         style={{ width: "100%", height: "100%" }}
       >
-        {/* Dynamic 10-min Day/Night Lighting, Sun, Moon & Stars */}
+        {/* Dynamic 10-min day/night lighting, sun, moon & stars */}
         <NatureLighting dayNight={dayNight} />
 
         <Suspense fallback={null}>
-          {/* Nature Landscape Terrain with Endless Ocean, Lake & Bridge */}
-          <NatureTerrain lampMultiplier={dayNight.lampIntensityMultiplier} />
+          {/* Terrain, horizon islands, world tree, meadow, props & pavilions */}
+          {staticWorld}
 
-          {/* Distant Horizon Mountain Ranges, Archipelago & Sea Stacks */}
-          <DistantIslands lampMultiplier={dayNight.lampIntensityMultiplier} />
-
-          {/* Low-Poly Fluffy Drifting Clouds */}
+          {/* Low-poly fluffy drifting clouds */}
           <LowPolyClouds dayNight={dayNight} />
 
-          {/* Majestic Grand Oak Centerpiece Tree */}
-          <GrandOak />
+          {/* Drifting leaves & atmospheric pollen */}
+          <WindParticles isNight={isNight} />
 
-          {/* 2000+ Dense Wildflower & Grass Meadow with Wind Sway */}
-          <InstancedGrass grassCount={2200} flowerCount={350} />
+          {/* Dynamic rain streaks & ground ripples */}
+          <RainWeather isRaining={isRaining} />
 
-          {/* Cottages, Workshops, Trees, Fences & Lanterns */}
-          <LowPolyProps lampMultiplier={dayNight.lampIntensityMultiplier} />
-
-          {/* Drifting Leaves & Atmospheric Pollen Particles */}
-          <WindParticles isNight={dayNight.isNight} />
-
-          {/* Dynamic Rain Weather Streaks & Ground Ripples */}
-          <RainWeather isRaining={dayNight.isRaining} buggyPos={buggyPos} />
-
-          {/* Red Off-Road Monster Buggy with Smooth Arcade Controls & Orbit Camera */}
+          {/* Red off-road buggy with arcade controls & orbit camera */}
           <RedBuggy
-            onPositionUpdate={handlePositionUpdate}
             teleportTo={teleportTarget}
-            onTeleportDone={() => setTeleportTarget(null)}
-            lampMultiplier={dayNight.lampIntensityMultiplier}
+            onTeleportDone={handleTeleportDone}
+            lampMultiplier={lampIntensityMultiplier}
+            controlsEnabled={!activeModal}
           />
 
-          {/* Outdoor Exhibition Pavilions */}
-          <ParkPavilions
-            buggyPosition={buggyPos}
-            lampMultiplier={dayNight.lampIntensityMultiplier}
-            onStationEnter={(station) => setActiveStation(station)}
-            onStationLeave={() => setActiveStation(null)}
-          />
-
-          {/* Atmospheric Golden Fireflies / Starlight Particles */}
+          {/* Golden fireflies by day, starlight motes at night */}
           <Sparkles
             count={80}
             scale={45}
-            size={dayNight.isNight ? 4.5 : 3.0}
+            size={isNight ? 4.5 : 3.0}
             speed={0.5}
-            color={dayNight.isNight ? "#60a5fa" : "#fbbf24"}
-            opacity={dayNight.isNight ? 0.75 : 0.45}
+            color={isNight ? "#60a5fa" : "#fbbf24"}
+            opacity={isNight ? 0.75 : 0.45}
           />
 
-          {/* Soft Ground Contact Ambient Occlusion */}
+          {/* Soft ground contact ambient occlusion */}
           <ContactShadows
             position={[0, 0.22, 0]}
             opacity={0.35}
@@ -207,42 +192,34 @@ export default function Home() {
             resolution={1024}
             color="#0f172a"
           />
+
+          <Preload all />
         </Suspense>
 
-        {/* Cinematic AAA Postprocessing */}
+        {/* Cinematic postprocessing */}
         <EffectComposer multisampling={4}>
           <Bloom
-            luminanceThreshold={dayNight.isNight ? 0.5 : 0.75}
+            luminanceThreshold={isNight ? 0.5 : 0.75}
             luminanceSmoothing={0.4}
-            intensity={dayNight.isNight ? 1.1 : 0.65}
+            intensity={isNight ? 1.1 : 0.65}
             mipmapBlur
           />
-          <Vignette eskil={false} offset={0.12} darkness={dayNight.isNight ? 0.55 : 0.35} />
+          <Vignette eskil={false} offset={0.12} darkness={isNight ? 0.55 : 0.35} />
           <ToneMapping />
         </EffectComposer>
+
+        {/* Drops resolution instead of frames when the GPU is under pressure */}
+        <AdaptiveDpr pixelated />
       </Canvas>
 
-      {/* ── 5 Interactive Web3 & Blockchain Modals ── */}
+      {/* ── 5 interactive Web3 & blockchain modals ── */}
       <GPUInspectorModal />
       <BlockchainVaultModal />
       <ServiceWorkshopModal />
       <QRScannerModal />
       <HardwareGalleryModal />
 
-      {/* Intro Loading Overlay – Cyber-Nature Glass */}
-      <div
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 pointer-events-none bg-slate-950/95"
-        style={{
-          animation: "fadeOut 1.2s ease-out 0.8s forwards",
-        }}
-      >
-        <div className="scale-125 mb-2">
-          <HardWAveLogo size={56} />
-        </div>
-        <p className="text-sm font-mono tracking-widest text-emerald-400 font-bold uppercase">
-          10-Minute Day & Night Living World
-        </p>
-      </div>
+      <IntroOverlay />
     </main>
   );
 }

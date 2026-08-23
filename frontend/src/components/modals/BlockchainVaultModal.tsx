@@ -1,40 +1,75 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  X,
-  Boxes,
-  ShieldCheck,
-  Sparkles,
-  Plus,
-  CheckCircle2,
-  Cpu,
-  Layers,
-  FileCheck,
-  ExternalLink,
-  QrCode,
-  Lock,
-  GitBranch,
-  Coins,
-} from "lucide-react";
+import { X, Boxes, Sparkles, Plus, CheckCircle2, GitBranch, Coins } from "lucide-react";
 import { THEME } from "@/theme/designSystem";
-import { useHardwareStore } from "@/store/hardwareStore";
+import { useHardwareStore, HardwareUnit } from "@/store/hardwareStore";
 import { useBlockchainEngine } from "@/store/blockchainEngine";
 import BlockchainGraphExplorer from "@/components/blockchain/BlockchainGraphExplorer";
 
+type HardwareCategory = HardwareUnit["category"];
+
+const HARDWARE_CATEGORIES: HardwareCategory[] = [
+  "GPU",
+  "Motherboard",
+  "SSD",
+  "RAM",
+  "Cooling",
+];
+
+/** Realistic sample hardware used by the "Auto-Fill Mock Spec" helper. */
+const CATEGORY_PRESETS: Record<
+  HardwareCategory,
+  { prefix: string; modelName: string; primarySpec: string; clockSpec: string }
+> = {
+  GPU: {
+    prefix: "HW-RTX4090",
+    modelName: "NVIDIA GeForce RTX 4090 OC 24GB",
+    primarySpec: "24 GB GDDR6X",
+    clockSpec: "2.52 GHz Boost",
+  },
+  Motherboard: {
+    prefix: "HW-Z790",
+    modelName: "ASUS ROG Maximus Z790 Hero",
+    primarySpec: "20+1 Power Stages",
+    clockSpec: "DDR5-7800 OC",
+  },
+  SSD: {
+    prefix: "HW-990PRO",
+    modelName: "Samsung 990 PRO 4TB PCIe 4.0 NVMe M.2",
+    primarySpec: "4,000 GB (4 TB)",
+    clockSpec: "7,450 MB/s Read",
+  },
+  RAM: {
+    prefix: "HW-DDR5",
+    modelName: "G.Skill Trident Z5 RGB 64GB DDR5-6000",
+    primarySpec: "2 x 32GB (64GB Total)",
+    clockSpec: "DDR5-6000 CL30",
+  },
+  Cooling: {
+    prefix: "HW-AIO360",
+    modelName: "HardWAve Cryo 360mm ARGB AIO Liquid Cooler",
+    primarySpec: "360mm Radiator",
+    clockSpec: "2,400 RPM PWM",
+  },
+};
+
 export default function BlockchainVaultModal() {
-  const { activeModal, setActiveModal, registerHardware, units, setActiveUnit } =
-    useHardwareStore();
-  const { addTransactionAndMine, userWallet } = useBlockchainEngine();
+  const activeModal = useHardwareStore((s) => s.activeModal);
+  const setActiveModal = useHardwareStore((s) => s.setActiveModal);
+  const registerHardware = useHardwareStore((s) => s.registerHardware);
+  const units = useHardwareStore((s) => s.units);
+  const setActiveUnit = useHardwareStore((s) => s.setActiveUnit);
+
+  const addTransactionAndMine = useBlockchainEngine((s) => s.addTransactionAndMine);
+  const userWallet = useBlockchainEngine((s) => s.userWallet);
 
   const [activeTab, setActiveTab] = useState<"graph" | "mint">("graph");
   const [serial, setSerial] = useState("");
   const [modelName, setModelName] = useState("");
-  const [category, setCategory] = useState<"GPU" | "Motherboard" | "SSD" | "RAM" | "Cooling">(
-    "GPU"
-  );
+  const [category, setCategory] = useState<HardwareCategory>("GPU");
   const [warrantyMonths, setWarrantyMonths] = useState(36);
-  const [vramSpec, setVramSpec] = useState("24 GB GDDR6X");
+  const [primarySpec, setPrimarySpec] = useState("24 GB GDDR6X");
   const [clockSpec, setClockSpec] = useState("1.70 GHz Boost");
   const [isMinting, setIsMinting] = useState(false);
   const [mintSuccess, setMintSuccess] = useState<string | null>(null);
@@ -51,7 +86,7 @@ export default function BlockchainVaultModal() {
     setTimeout(() => {
       const specs: Record<string, string> = {
         Category: category,
-        "Primary Spec": vramSpec,
+        "Primary Spec": primarySpec,
         "Clock Speed": clockSpec,
         Standard: "ERC-721 On-Chain Hardware Token",
       };
@@ -83,18 +118,25 @@ export default function BlockchainVaultModal() {
     }, 1200);
   };
 
-  const generateRandomSerial = () => {
-    const prefix = category === "GPU" ? "HW-RTX4090" : category === "SSD" ? "HW-990PRO" : "HW-GEN";
-    const rand = Math.floor(10000 + Math.random() * 90000);
-    setSerial(`${prefix}-${rand}`);
-    if (category === "GPU") setModelName("NVIDIA GeForce RTX 4090 OC 24GB");
-    if (category === "SSD") setModelName("Samsung 990 PRO 4TB PCIe 4.0 NVMe M.2");
-    if (category === "RAM") setModelName("G.Skill Trident Z5 RGB 64GB DDR5-6000");
-    if (category === "Motherboard") setModelName("ASUS ROG Maximus Z790 Hero");
+  const autoFillMockSpec = () => {
+    const preset = CATEGORY_PRESETS[category];
+    setSerial(`${preset.prefix}-${Math.floor(10000 + Math.random() * 90000)}`);
+    setModelName(preset.modelName);
+    setPrimarySpec(preset.primarySpec);
+    setClockSpec(preset.clockSpec);
+    setMintSuccess(null);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-2xl animate-in fade-in duration-200 select-none">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-2xl hw-fade-in select-none"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sovereign blockchain vault and DAG graph"
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) setActiveModal(null);
+      }}
+    >
       <div
         className="w-full max-w-5xl h-[88vh] rounded-3xl border flex flex-col overflow-hidden shadow-2xl relative"
         style={{
@@ -114,7 +156,7 @@ export default function BlockchainVaultModal() {
                 <h2 className="text-base font-black text-white">Sovereign Blockchain Vault & Graph</h2>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center gap-1">
                   <Coins size={11} />
-                  <span>Wallet: {userWallet.balanceETH} ETH</span>
+                  <span>Wallet: {userWallet.balanceETH.toFixed(3)} ETH</span>
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-mono">
@@ -152,6 +194,7 @@ export default function BlockchainVaultModal() {
 
             <button
               onClick={() => setActiveModal(null)}
+              aria-label="Close vault"
               className="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
             >
               <X size={20} />
@@ -166,7 +209,7 @@ export default function BlockchainVaultModal() {
           ) : (
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden -m-6">
               {/* Left Form: Factory Minting */}
-              <div className="flex-1 p-6 overflow-y-auto border-r border-white/10 space-y-5">
+              <div className="flex-1 p-6 overflow-y-auto hw-scroll border-r border-white/10 space-y-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-white">Mint New Hardware Identity</h3>
@@ -176,7 +219,7 @@ export default function BlockchainVaultModal() {
                   </div>
                   <button
                     type="button"
-                    onClick={generateRandomSerial}
+                    onClick={autoFillMockSpec}
                     className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                   >
                     <Sparkles size={13} />
@@ -185,7 +228,7 @@ export default function BlockchainVaultModal() {
                 </div>
 
                 {mintSuccess && (
-                  <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-between text-emerald-300 text-xs animate-in zoom-in-95">
+                  <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-between text-emerald-300 text-xs hw-zoom-in">
                     <div className="flex items-center gap-2.5">
                       <CheckCircle2 size={18} className="text-emerald-400" />
                       <div>
@@ -217,7 +260,7 @@ export default function BlockchainVaultModal() {
                       Hardware Category
                     </label>
                     <div className="grid grid-cols-5 gap-2">
-                      {(["GPU", "Motherboard", "SSD", "RAM", "Cooling"] as const).map((cat) => (
+                      {HARDWARE_CATEGORIES.map((cat) => (
                         <button
                           key={cat}
                           type="button"
@@ -272,8 +315,20 @@ export default function BlockchainVaultModal() {
                       </label>
                       <input
                         type="text"
-                        value={vramSpec}
-                        onChange={(e) => setVramSpec(e.target.value)}
+                        value={primarySpec}
+                        onChange={(e) => setPrimarySpec(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-mono focus:border-purple-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Clock Speed / Throughput
+                      </label>
+                      <input
+                        type="text"
+                        value={clockSpec}
+                        onChange={(e) => setClockSpec(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-mono focus:border-purple-400 focus:outline-none"
                       />
                     </div>
@@ -311,7 +366,7 @@ export default function BlockchainVaultModal() {
               </div>
 
               {/* Right List: On-Chain Registry Feed */}
-              <div className="w-full md:w-[360px] bg-black/40 p-6 flex flex-col overflow-y-auto space-y-4">
+              <div className="w-full md:w-[360px] bg-black/40 p-6 flex flex-col overflow-y-auto hw-scroll space-y-4">
                 <div className="flex items-center justify-between border-b border-white/10 pb-3">
                   <span className="text-xs font-black uppercase tracking-wider text-white">
                     Live On-Chain Registry
@@ -321,7 +376,7 @@ export default function BlockchainVaultModal() {
                   </span>
                 </div>
 
-                <div className="space-y-2.5 flex-1 overflow-y-auto pr-1">
+                <div className="space-y-2.5 flex-1 overflow-y-auto hw-scroll pr-1">
                   {units.map((u) => (
                     <div
                       key={u.tokenId}

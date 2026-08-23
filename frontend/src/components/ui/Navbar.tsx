@@ -1,26 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  Wallet,
-  CheckCircle2,
-  Gamepad2,
-  Compass,
-  X,
-  Sun,
-  Moon,
-  Navigation,
-  Sparkles,
-  CloudRain,
-  CloudSun,
-  Coins,
-  ShoppingBag,
-  Boxes,
-} from "lucide-react";
+import { Gamepad2, Compass, Sun, Moon, CloudRain, CloudSun, Coins } from "lucide-react";
 import HardWAveLogo from "@/components/ui/HardWAveLogo";
 import SoundController from "@/components/ui/SoundController";
-import { STATIONS, StationDef, StationIcon } from "@/components/3d/nature/ParkPavilions";
+import { STATIONS, StationIcon } from "@/components/3d/nature/ParkPavilions";
 import { DayNightState } from "@/hooks/useDayNightCycle";
 import { THEME } from "@/theme/designSystem";
 import { useBlockchainEngine } from "@/store/blockchainEngine";
@@ -28,18 +13,36 @@ import { useHardwareStore } from "@/store/hardwareStore";
 
 interface NavbarProps {
   dayNight: DayNightState;
-  activeStation: StationDef | null;
   onTeleport: (stationId: string) => void;
-  speed?: number;
 }
 
-export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 }: NavbarProps) {
+export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
   const [showControls, setShowControls] = useState(false);
   const [showFastTravel, setShowFastTravel] = useState(false);
 
-  const { timeString, isNight, progress } = dayNight;
-  const { userWallet } = useBlockchainEngine();
-  const { setActiveModal } = useHardwareStore();
+  const { timeString, isNight } = dayNight;
+  const userWallet = useBlockchainEngine((s) => s.userWallet);
+  const setActiveModal = useHardwareStore((s) => s.setActiveModal);
+
+  // Dismiss the popovers with Escape and on any outside interaction.
+  useEffect(() => {
+    if (!showControls && !showFastTravel) return;
+
+    const close = () => {
+      setShowControls(false);
+      setShowFastTravel(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", close);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", close);
+    };
+  }, [showControls, showFastTravel]);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 select-none p-3 pointer-events-none">
@@ -57,7 +60,7 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
             }}
           >
             <div className="transition-transform duration-300 group-hover:scale-105">
-              <HardWAveLogo size={36} />
+              <HardWAveLogo size={36} variant="mark" />
             </div>
             <div className="hidden sm:block">
               <span className="text-sm font-black tracking-wider text-white">HardWAve</span>
@@ -94,7 +97,7 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
         {/* ── Right Corner: Controls, Fast Travel, Weather, Audio & Sovereign Web3 Wallet ── */}
         <div className="flex items-center gap-2 pointer-events-auto shrink-0">
           {/* 1. Minimized Controls Icon Button */}
-          <div className="relative">
+          <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
             <button
               onClick={() => {
                 setShowControls(!showControls);
@@ -117,7 +120,7 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
             {/* Controls Popover */}
             {showControls && (
               <div
-                className="absolute top-12 right-0 w-72 p-4 rounded-3xl border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 select-none space-y-3"
+                className="absolute top-12 right-0 w-72 p-4 rounded-3xl border shadow-2xl hw-popover z-50 select-none space-y-3"
                 style={{
                   background: THEME.colors.glass.bgElevated,
                   borderColor: THEME.colors.glass.border,
@@ -175,7 +178,7 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
           </div>
 
           {/* 2. Fast Travel Popover */}
-          <div className="relative">
+          <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
             <button
               onClick={() => {
                 setShowFastTravel(!showFastTravel);
@@ -197,7 +200,7 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
 
             {showFastTravel && (
               <div
-                className="absolute top-12 right-0 w-72 p-3 rounded-3xl border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 select-none space-y-1.5"
+                className="absolute top-12 right-0 w-72 p-3 rounded-3xl border shadow-2xl hw-popover z-50 select-none space-y-1.5"
                 style={{
                   background: THEME.colors.glass.bgElevated,
                   borderColor: THEME.colors.glass.border,
@@ -264,7 +267,6 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
           {/* 4. Sound & BGM Settings Icon Button */}
           <SoundController
             isNight={dayNight.isNight}
-            speed={speed}
             isRaining={dayNight.isRaining}
             onToggleRain={dayNight.toggleRain}
           />
@@ -284,7 +286,10 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
           >
             <Coins className="w-4 h-4 text-amber-300 animate-pulse" />
             <span className="font-mono font-bold tracking-wide">
-              {userWallet.balanceETH} ETH
+              {userWallet.balanceETH.toFixed(3)} ETH
+            </span>
+            <span className="hidden md:inline text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-200">
+              {userWallet.balanceHWAVE.toFixed(0)} HWAVE
             </span>
             <span className="hidden sm:inline text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-purple-200">
               {userWallet.ownedTokens.length} NFTs

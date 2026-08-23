@@ -3,35 +3,33 @@
 import React, { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { createRng, WORLD_SEEDS } from "@/utils/rng";
+import { liveTelemetry } from "@/store/worldTelemetry";
 
-interface RainWeatherProps {
-  isRaining: boolean;
-  buggyPos: THREE.Vector3 | [number, number, number];
-}
+const DROP_COUNT = 1800;
+const SPLASH_COUNT = 120;
+/** Rain volume tracks the buggy, so drops only exist where they can be seen. */
+const FIELD_SIZE = 60;
 
-export default function RainWeather({ isRaining, buggyPos }: RainWeatherProps) {
+export default function RainWeather({ isRaining }: { isRaining: boolean }) {
   const rainRef = useRef<THREE.Points>(null);
   const splashesRef = useRef<THREE.InstancedMesh>(null);
-  const dropCount = 1800;
-  const splashCount = 120;
 
-  const posX = Array.isArray(buggyPos) ? buggyPos[0] : buggyPos.x;
-  const posZ = Array.isArray(buggyPos) ? buggyPos[2] : buggyPos.z;
-
-  // Rain particle positions & velocities
+  // Deterministic seeding keeps the storm identical across remounts.
   const [positions, velocities] = useMemo(() => {
-    const pos = new Float32Array(dropCount * 3);
-    const vel = new Float32Array(dropCount);
+    const rng = createRng(WORLD_SEEDS.rain);
+    const pos = new Float32Array(DROP_COUNT * 3);
+    const vel = new Float32Array(DROP_COUNT);
 
-    for (let i = 0; i < dropCount; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 60;
-      pos[i * 3 + 1] = Math.random() * 30 + 0.2;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 60;
-      vel[i] = 16 + Math.random() * 12; // Falling speed (m/s)
+    for (let i = 0; i < DROP_COUNT; i++) {
+      pos[i * 3] = (rng.next() - 0.5) * FIELD_SIZE;
+      pos[i * 3 + 1] = rng.next() * 30 + 0.2;
+      pos[i * 3 + 2] = (rng.next() - 0.5) * FIELD_SIZE;
+      vel[i] = 16 + rng.next() * 12; // Falling speed (m/s)
     }
 
-    return [pos, vel];
-  }, [dropCount]);
+    return [pos, vel] as const;
+  }, []);
 
   const rainGeo = useMemo(() => {
     const geo = new THREE.BufferGeometry();
@@ -39,44 +37,45 @@ export default function RainWeather({ isRaining, buggyPos }: RainWeatherProps) {
     return geo;
   }, [positions]);
 
-  // Splashes dummy
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  // Recycling drops needs randomness every frame; a dedicated stream keeps the
+  // initial layout reproducible while the storm still looks chaotic.
+  const respawnRng = useMemo(() => createRng(WORLD_SEEDS.rain ^ 0x9e3779b9), []);
 
   useFrame((state, delta) => {
     if (!isRaining) return;
 
-    const currentX = Array.isArray(buggyPos) ? buggyPos[0] : buggyPos.x;
-    const currentZ = Array.isArray(buggyPos) ? buggyPos[2] : buggyPos.z;
+    const { x: currentX, z: currentZ } = liveTelemetry.position;
 
-    // Animate falling rain streaks centered around the buggy
     if (rainRef.current) {
       const posAttr = rainRef.current.geometry.attributes.position as THREE.BufferAttribute;
       const array = posAttr.array as Float32Array;
 
-      for (let i = 0; i < dropCount; i++) {
+      for (let i = 0; i < DROP_COUNT; i++) {
         array[i * 3 + 1] -= velocities[i] * delta;
 
-        // Reset drop when hitting ground
+        // Recycle the drop above the buggy once it reaches the ground.
         if (array[i * 3 + 1] < 0.2) {
-          array[i * 3] = currentX + (Math.random() - 0.5) * 60;
-          array[i * 3 + 1] = 28 + Math.random() * 6;
-          array[i * 3 + 2] = currentZ + (Math.random() - 0.5) * 60;
+          array[i * 3] = currentX + (respawnRng.next() - 0.5) * FIELD_SIZE;
+          array[i * 3 + 1] = 28 + respawnRng.next() * 6;
+          array[i * 3 + 2] = currentZ + (respawnRng.next() - 0.5) * FIELD_SIZE;
         }
       }
       posAttr.needsUpdate = true;
     }
 
-    // Animate subtle ground splashes
     if (splashesRef.current) {
       const t = state.clock.elapsedTime;
-      for (let i = 0; i < splashCount; i++) {
-        const angle = (i / splashCount) * Math.PI * 2 + t * 2.5;
+      for (let i = 0; i < SPLASH_COUNT; i++) {
+        const angle = (i / SPLASH_COUNT) * Math.PI * 2 + t * 2.5;
         const dist = 3 + (i % 8) * 3.5;
-        const x = currentX + Math.cos(angle) * dist;
-        const z = currentZ + Math.sin(angle) * dist;
         const scale = 0.2 + (Math.sin(t * 8 + i) * 0.5 + 0.5) * 0.35;
 
-        dummy.position.set(x, 0.22, z);
+        dummy.position.set(
+          currentX + Math.cos(angle) * dist,
+          0.22,
+          currentZ + Math.sin(angle) * dist
+        );
         dummy.scale.set(scale, 0.05, scale);
         dummy.updateMatrix();
         splashesRef.current.setMatrixAt(i, dummy.matrix);
@@ -89,8 +88,8 @@ export default function RainWeather({ isRaining, buggyPos }: RainWeatherProps) {
 
   return (
     <group>
-      {/* 1. Vertical Falling Rain Points */}
-      <points ref={rainRef} geometry={rainGeo}>
+      {/* 1. Vertical falling rain streaks */}
+      <points ref={rainRef} geometry={rainGeo} frustumCulled={false} raycast={() => null}>
         <pointsMaterial
           color="#bae6fd"
           size={0.16}
@@ -101,10 +100,11 @@ export default function RainWeather({ isRaining, buggyPos }: RainWeatherProps) {
         />
       </points>
 
-      {/* 2. Ground Rain Splash Ripples */}
+      {/* 2. Ground splash ripples */}
       <instancedMesh
         ref={splashesRef}
-        args={[undefined, undefined, splashCount]}
+        args={[undefined, undefined, SPLASH_COUNT]}
+        frustumCulled={false}
         raycast={() => null}
       >
         <ringGeometry args={[0.1, 0.35, 8]} />

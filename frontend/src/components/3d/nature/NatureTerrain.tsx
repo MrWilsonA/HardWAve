@@ -3,7 +3,6 @@
 import React, { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { getTerrainHeight } from "@/utils/terrainPhysics";
 
 /* ───────────────────────────────────────────
    Pure Radial 360° Island & Infinite Ocean (With Carved East Lake Basin)

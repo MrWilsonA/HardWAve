@@ -5,6 +5,11 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useVehicleControls } from "@/hooks/useVehicleControls";
 import { getTerrainHeight, resolveObstacleCollision } from "@/utils/terrainPhysics";
+import {
+  createHudSyncGate,
+  liveTelemetry,
+  useWorldTelemetry,
+} from "@/store/worldTelemetry";
 
 /* ───────────────────────────────────────────
    Red Buggy – Smooth Arcade Vehicle & Interactive Orbital Camera
@@ -23,17 +28,18 @@ const STEER_SPEED = 2.8;
 const STEER_RETURN = 6.0;
 
 interface RedBuggyProps {
-  onPositionUpdate?: (pos: THREE.Vector3) => void;
   teleportTo?: THREE.Vector3 | null;
   onTeleportDone?: () => void;
   lampMultiplier?: number;
+  /** False while a pavilion modal is open: driving and camera drag are frozen. */
+  controlsEnabled?: boolean;
 }
 
 export default function RedBuggy({
-  onPositionUpdate,
   teleportTo,
   onTeleportDone,
   lampMultiplier = 1,
+  controlsEnabled = true,
 }: RedBuggyProps) {
   const groupRef = useRef<THREE.Group>(null);
   const chassisRef = useRef<THREE.Group>(null);
@@ -42,7 +48,7 @@ export default function RedBuggy({
   const wheelRLRef = useRef<THREE.Group>(null);
   const wheelRRRef = useRef<THREE.Group>(null);
 
-  const input = useVehicleControls();
+  const input = useVehicleControls(controlsEnabled);
   const { camera, gl } = useThree();
 
   // Initial spawn: On South Road facing North towards Grand Oak & Lake
@@ -73,7 +79,9 @@ export default function RedBuggy({
 
   // Attach pointer drag & wheel zoom listeners to canvas
   useEffect(() => {
+    if (!controlsEnabled) return;
     const dom = gl.domElement;
+    const orb = orbitState.current;
 
     const onPointerDown = (e: PointerEvent) => {
       // Primary button (left click)
@@ -119,15 +127,18 @@ export default function RedBuggy({
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       dom.removeEventListener("wheel", onWheel);
+      orb.isDragging = false;
     };
-  }, [gl]);
+  }, [gl, controlsEnabled]);
 
   // ── Dynamic Vehicle Engine Drive Sound ──
   const driveAudioRef = useRef<HTMLAudioElement | null>(null);
   const engineVolumeRef = useRef<number>(0.0);
 
   useEffect(() => {
-    const audio = new Audio("/audio/drive.mp3");
+    const audio = new Audio();
+    audio.preload = "none";
+    audio.src = "/audio/drive.mp3";
     audio.loop = true;
     audio.volume = 0.0;
     driveAudioRef.current = audio;
@@ -138,21 +149,33 @@ export default function RedBuggy({
     };
   }, []);
 
-  // Handle teleport
-  const prevTeleport = useRef<THREE.Vector3 | null>(null);
-  if (teleportTo && teleportTo !== prevTeleport.current) {
-    prevTeleport.current = teleportTo;
-    state.current.position.copy(teleportTo);
-    state.current.position.y = getTerrainHeight(teleportTo.x, teleportTo.z) + 0.38;
-    state.current.speed = 0;
-    state.current.steerAngle = 0;
-    if (groupRef.current) {
-      groupRef.current.position.copy(state.current.position);
-    }
-    onTeleportDone?.();
-  }
+  // ── Fast-travel teleport (applied outside render so refs stay untouched) ──
+  useEffect(() => {
+    if (!teleportTo) return;
 
-  useFrame((_, delta) => {
+    const s = state.current;
+    s.position.copy(teleportTo);
+    s.position.y = getTerrainHeight(teleportTo.x, teleportTo.z) + 0.38;
+    s.speed = 0;
+    s.steerAngle = 0;
+    groupRef.current?.position.copy(s.position);
+
+    // Re-seat the orbit camera at the destination to avoid a long fly-over.
+    const orb = orbitState.current;
+    orb.cameraPosSmooth.set(s.position.x, s.position.y + 10, s.position.z + 15);
+    orb.cameraLookSmooth.copy(s.position);
+
+    liveTelemetry.position.copy(s.position);
+    liveTelemetry.speed = 0;
+    useWorldTelemetry.getState().syncFromLive();
+
+    onTeleportDone?.();
+  }, [teleportTo, onTeleportDone]);
+
+  // Throttle gate for mirroring telemetry into React state for the HUD.
+  const shouldSyncHud = useRef(createHudSyncGate());
+
+  useFrame((frameState, delta) => {
     const dt = Math.min(delta, 0.05);
     const s = state.current;
     const inp = input.current;
@@ -311,8 +334,15 @@ export default function RedBuggy({
     camera.position.copy(orb.cameraPosSmooth);
     camera.lookAt(orb.cameraLookSmooth);
 
-    // ── Report position ──
-    onPositionUpdate?.(s.position.clone());
+    // ── Publish telemetry: every frame to the mutable mirror (read by the
+    //    scene inside useFrame), throttled to ~10 Hz for the DOM HUD. ──
+    liveTelemetry.position.copy(s.position);
+    liveTelemetry.rotation = s.rotation;
+    liveTelemetry.speed = s.speed;
+
+    if (shouldSyncHud.current(frameState.clock.elapsedTime * 1000)) {
+      useWorldTelemetry.getState().syncFromLive();
+    }
   });
 
   return (

@@ -4,6 +4,7 @@ import React, { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { DayNightState } from "@/hooks/useDayNightCycle";
+import { createRng, WORLD_SEEDS } from "@/utils/rng";
 
 /* ───────────────────────────────────────────
    Low-Poly Fluffy 3D Clouds
@@ -27,18 +28,19 @@ export default function LowPolyClouds({ dayNight }: { dayNight: DayNightState })
 
   // Generate 12 distinct fluffy cloud clusters
   const clouds = useMemo<CloudData[]>(() => {
+    const rng = createRng(WORLD_SEEDS.clouds);
     const list: CloudData[] = [];
     const count = 12;
 
     for (let i = 0; i < count; i++) {
-      const initialX = -60 + (i / count) * 120 + (Math.random() - 0.5) * 15;
-      const y = 22 + Math.random() * 12; // Altitude between 22 and 34
-      const z = -45 + Math.random() * 90;
-      const scale = 1.6 + Math.random() * 1.4;
-      const speed = 0.8 + Math.random() * 0.6;
+      const initialX = -60 + (i / count) * 120 + (rng.next() - 0.5) * 15;
+      const y = 22 + rng.next() * 12; // Altitude between 22 and 34
+      const z = -45 + rng.next() * 90;
+      const scale = 1.6 + rng.next() * 1.4;
+      const speed = 0.8 + rng.next() * 0.6;
 
       // 4 to 6 sub-puffs per cloud
-      const puffCount = 4 + Math.floor(Math.random() * 3);
+      const puffCount = 4 + Math.floor(rng.next() * 3);
       const clusters: { offset: [number, number, number]; scale: number }[] = [
         { offset: [0, 0, 0], scale: 1.0 }, // Central puff
       ];
@@ -46,11 +48,11 @@ export default function LowPolyClouds({ dayNight }: { dayNight: DayNightState })
       for (let p = 1; p < puffCount; p++) {
         clusters.push({
           offset: [
-            (Math.random() - 0.5) * 2.8,
-            (Math.random() - 0.3) * 1.2,
-            (Math.random() - 0.5) * 2.2,
+            (rng.next() - 0.5) * 2.8,
+            (rng.next() - 0.3) * 1.2,
+            (rng.next() - 0.5) * 2.2,
           ],
-          scale: 0.6 + Math.random() * 0.55,
+          scale: 0.6 + rng.next() * 0.55,
         });
       }
 

@@ -3,6 +3,7 @@
 import React, { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { createRng, WORLD_SEEDS } from "@/utils/rng";
 
 /* ───────────────────────────────────────────
    Wind Particles – Drifting Leaves & Pollen
@@ -33,41 +34,44 @@ export default function WindParticles({ isNight = false }: { isNight?: boolean }
 
   // Initialize leaf particles
   const leaves = useMemo<ParticleData[]>(() => {
+    const rng = createRng(WORLD_SEEDS.leaves);
     return Array.from({ length: LEAF_COUNT }, () => ({
       position: new THREE.Vector3(
-        (Math.random() - 0.5) * DRIFT_RADIUS * 2,
-        2 + Math.random() * 10,
-        (Math.random() - 0.5) * DRIFT_RADIUS * 2
+        (rng.next() - 0.5) * DRIFT_RADIUS * 2,
+        2 + rng.next() * 10,
+        (rng.next() - 0.5) * DRIFT_RADIUS * 2
       ),
-      velocity: WIND_DIR.clone().multiplyScalar(WIND_SPEED * (0.6 + Math.random() * 0.8)),
-      phase: Math.random() * Math.PI * 2,
-      spinSpeed: 1.5 + Math.random() * 3,
-      scale: 0.12 + Math.random() * 0.18,
+      velocity: WIND_DIR.clone().multiplyScalar(WIND_SPEED * (0.6 + rng.next() * 0.8)),
+      phase: rng.next() * Math.PI * 2,
+      spinSpeed: 1.5 + rng.next() * 3,
+      scale: 0.12 + rng.next() * 0.18,
     }));
   }, []);
 
   // Initialize pollen/dust motes
   const pollen = useMemo<ParticleData[]>(() => {
+    const rng = createRng(WORLD_SEEDS.pollen);
     return Array.from({ length: POLLEN_COUNT }, () => ({
       position: new THREE.Vector3(
-        (Math.random() - 0.5) * DRIFT_RADIUS * 2,
-        1 + Math.random() * 8,
-        (Math.random() - 0.5) * DRIFT_RADIUS * 2
+        (rng.next() - 0.5) * DRIFT_RADIUS * 2,
+        1 + rng.next() * 8,
+        (rng.next() - 0.5) * DRIFT_RADIUS * 2
       ),
-      velocity: WIND_DIR.clone().multiplyScalar(WIND_SPEED * (0.2 + Math.random() * 0.4)),
-      phase: Math.random() * Math.PI * 2,
+      velocity: WIND_DIR.clone().multiplyScalar(WIND_SPEED * (0.2 + rng.next() * 0.4)),
+      phase: rng.next() * Math.PI * 2,
       spinSpeed: 0,
-      scale: 0.03 + Math.random() * 0.04,
+      scale: 0.03 + rng.next() * 0.04,
     }));
   }, []);
 
   // Leaf colors
   const leafColors = useMemo(() => {
+    const rng = createRng(WORLD_SEEDS.leaves ^ 0x5bf03635);
     const colors = ["#ea580c", "#f97316", "#fb923c", "#65a30d", "#d97706", "#f59e0b"];
     const arr = new Float32Array(LEAF_COUNT * 3);
     const c = new THREE.Color();
     for (let i = 0; i < LEAF_COUNT; i++) {
-      c.set(colors[Math.floor(Math.random() * colors.length)]);
+      c.set(rng.pick(colors));
       arr[i * 3] = c.r;
       arr[i * 3 + 1] = c.g;
       arr[i * 3 + 2] = c.b;
@@ -178,6 +182,7 @@ export default function WindParticles({ isNight = false }: { isNight?: boolean }
         args={[leafGeo, undefined, LEAF_COUNT]}
         castShadow={false}
         receiveShadow={false}
+        frustumCulled={false}
         raycast={() => null}
       >
         <meshStandardMaterial
@@ -194,6 +199,7 @@ export default function WindParticles({ isNight = false }: { isNight?: boolean }
         args={[pollenGeo, undefined, POLLEN_COUNT]}
         castShadow={false}
         receiveShadow={false}
+        frustumCulled={false}
         raycast={() => null}
       >
         <meshStandardMaterial

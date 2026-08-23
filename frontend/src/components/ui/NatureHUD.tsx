@@ -1,33 +1,35 @@
 "use client";
 
 import React from "react";
-import * as THREE from "three";
 import { Gauge, Zap, MapPin, Sparkles } from "lucide-react";
 import { STATIONS, StationDef, StationIcon } from "@/components/3d/nature/ParkPavilions";
 import { THEME } from "@/theme/designSystem";
+import { useWorldTelemetry } from "@/store/worldTelemetry";
 
 interface NatureHUDProps {
   activeStation: StationDef | null;
   onTeleport: (stationId: string) => void;
   onInteract?: () => void;
-  speed?: number;
-  buggyPos?: THREE.Vector3;
 }
 
-export default function NatureHUD({
-  activeStation,
-  onTeleport,
-  onInteract,
-  speed = 0,
-  buggyPos = new THREE.Vector3(0, 0, 0),
-}: NatureHUDProps) {
-  // Mini-map coordinate mapping
-  const mapSize = 120;
-  const mapRadius = mapSize / 2;
-  const mapScale = (mapRadius - 10) / 48;
+// Mini-map coordinate mapping (world radius 48m onto a 120px radar)
+const MAP_SIZE = 120;
+const MAP_RADIUS = MAP_SIZE / 2;
+const MAP_SCALE = (MAP_RADIUS - 10) / 48;
 
-  const playerRadarX = mapRadius + buggyPos.x * mapScale;
-  const playerRadarY = mapRadius + buggyPos.z * mapScale;
+export default function NatureHUD({ activeStation, onTeleport, onInteract }: NatureHUDProps) {
+  // Telemetry is mirrored at ~10 Hz, so the HUD stays live without pulling the
+  // whole page into the 60 fps render loop.
+  const x = useWorldTelemetry((s) => s.x);
+  const z = useWorldTelemetry((s) => s.z);
+  const speed = useWorldTelemetry((s) => s.speed);
+
+  const mapSize = MAP_SIZE;
+  const mapRadius = MAP_RADIUS;
+  const mapScale = MAP_SCALE;
+
+  const playerRadarX = mapRadius + x * mapScale;
+  const playerRadarY = mapRadius + z * mapScale;
 
   return (
     <>
@@ -211,7 +213,7 @@ export default function NatureHUD({
       {activeStation && (
         <div
           onClick={onInteract}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-4 duration-300 cursor-pointer active:scale-95 transition-transform"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 hw-slide-up cursor-pointer active:scale-95 transition-transform"
         >
           <div
             className="rounded-2xl px-6 py-4 border flex items-center gap-4 shadow-2xl hover:scale-102 transition-all"

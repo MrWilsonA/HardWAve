@@ -118,7 +118,7 @@ export default function DistantIslands({ lampMultiplier = 1 }: { lampMultiplier?
   );
 
   // Rotate distant lighthouse beacon
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (beaconRef.current) {
       beaconRef.current.target.position.x = -130 + Math.cos(Date.now() * 0.001) * 80;
       beaconRef.current.target.position.z = -140 + Math.sin(Date.now() * 0.001) * 80;
@@ -189,7 +189,7 @@ export default function DistantIslands({ lampMultiplier = 1 }: { lampMultiplier?
       ))}
 
       {/* ── Distant Sea Stacks (Ocean Rock Pillars) ── */}
-      {seaStacks.map(([sx, sy, sz, rad, h], i) => (
+      {seaStacks.map(([sx, , sz, rad, h], i) => (
         <mesh key={`stack-${i}`} position={[sx, h / 2 - 0.5, sz]}>
           <cylinderGeometry args={[rad * 0.65, rad * 1.1, h, 6]} />
           <meshStandardMaterial color="#475569" flatShading roughness={0.95} />

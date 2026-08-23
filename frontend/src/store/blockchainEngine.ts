@@ -2,10 +2,13 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { sha256, stringToHex } from "viem";
+
+export type TransactionType = "MINT" | "PURCHASE" | "SERVICE" | "TRANSFER";
 
 export interface Transaction {
   txHash: string;
-  type: "MINT" | "PURCHASE" | "SERVICE" | "TRANSFER";
+  type: TransactionType;
   from: string;
   to: string;
   tokenId?: number;
@@ -28,205 +31,426 @@ export interface Block {
   gasUsed: number;
 }
 
-function pseudoSha256(input: string): string {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  const hex1 = Math.abs(hash).toString(16).padStart(8, "0");
-  const hex2 = Math.abs((hash * 31) | 0).toString(16).padStart(8, "0");
-  const hex3 = Math.abs((hash * 67) | 0).toString(16).padStart(8, "0");
-  const hex4 = Math.abs((hash * 127) | 0).toString(16).padStart(8, "0");
-  return `0x0000${hex1}${hex2}${hex3}${hex4}`.substring(0, 66);
+/* ───────────────────────────────────────────
+   Cryptography — real SHA-256 over canonical
+   block & transaction encodings (viem / @noble).
+   ─────────────────────────────────────────── */
+
+export const ZERO_HASH = `0x${"0".repeat(64)}`;
+export const ZERO_ADDRESS = `0x${"0".repeat(40)}`;
+
+/** Proof-of-Work target: a valid block hash must open with this many zero nibbles. */
+export const POW_DIFFICULTY = 4;
+/**
+ * Safety valve so a slow device can never lock the UI thread indefinitely.
+ * At difficulty 4 the expected search is ~65k hashes, so exhausting this cap is
+ * a ~1-in-3-million event while the worst case still bounds at a few seconds.
+ */
+const MAX_POW_ITERATIONS = 1_000_000;
+
+/** SHA-256 of an arbitrary UTF-8 string, as a 0x-prefixed 32-byte hex digest. */
+export function hashString(input: string): string {
+  return sha256(stringToHex(input));
 }
 
-const INITIAL_GENESIS_CHAIN: Block[] = [
-  {
-    blockNumber: 0,
-    hash: "0x00008f1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e90",
-    previousHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-    merkleRoot: "0x4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b",
-    nonce: 48291,
-    timestamp: Date.now() - 30 * 24 * 3600 * 1000,
-    miner: "0x0000000000000000000000000000000000000000 (HardWAve Genesis Node)",
-    gasUsed: 21000,
-    transactions: [
+/** Canonical encoding of a transaction, hashed to produce its immutable txHash. */
+export function computeTxHash(tx: Omit<Transaction, "txHash">): string {
+  return hashString(
+    [
+      tx.type,
+      tx.from,
+      tx.to,
+      tx.tokenId ?? "",
+      tx.serialNumber ?? "",
+      tx.hardwareName ?? "",
+      tx.amountETH ?? 0,
+      tx.details,
+      tx.timestamp,
+    ].join("|")
+  );
+}
+
+/**
+ * Merkle root over the block's transaction hashes. Levels fold pairwise and a
+ * lone trailing node is duplicated, matching Bitcoin's construction.
+ */
+export function computeMerkleRoot(transactions: Transaction[]): string {
+  if (transactions.length === 0) return ZERO_HASH;
+
+  let level = transactions.map((tx) => tx.txHash);
+  while (level.length > 1) {
+    const next: string[] = [];
+    for (let i = 0; i < level.length; i += 2) {
+      const left = level[i];
+      const right = level[i + 1] ?? left;
+      next.push(hashString(`${left}${right}`));
+    }
+    level = next;
+  }
+  return level[0];
+}
+
+/** Serializes the block header so hashing covers every consensus-critical field. */
+function serializeHeader(
+  blockNumber: number,
+  previousHash: string,
+  merkleRoot: string,
+  timestamp: number,
+  miner: string,
+  gasUsed: number,
+  nonce: number
+): string {
+  return [blockNumber, previousHash, merkleRoot, timestamp, miner, gasUsed, nonce].join("|");
+}
+
+/** Searches for a nonce whose header digest satisfies the difficulty target. */
+export function mineHeader(
+  blockNumber: number,
+  previousHash: string,
+  merkleRoot: string,
+  timestamp: number,
+  miner: string,
+  gasUsed: number
+): { hash: string; nonce: number } {
+  const target = `0x${"0".repeat(POW_DIFFICULTY)}`;
+
+  for (let nonce = 0; nonce < MAX_POW_ITERATIONS; nonce++) {
+    const hash = hashString(
+      serializeHeader(blockNumber, previousHash, merkleRoot, timestamp, miner, gasUsed, nonce)
+    );
+    if (hash.startsWith(target)) return { hash, nonce };
+  }
+
+  // Difficulty unreachable on this device — publish the best-effort header.
+  const nonce = MAX_POW_ITERATIONS;
+  return {
+    hash: hashString(
+      serializeHeader(blockNumber, previousHash, merkleRoot, timestamp, miner, gasUsed, nonce)
+    ),
+    nonce,
+  };
+}
+
+/** Re-derives every hash in the chain and reports the first tampered block. */
+export function verifyChain(chain: Block[]): { valid: boolean; brokenAt: number | null } {
+  for (let i = 0; i < chain.length; i++) {
+    const block = chain[i];
+
+    if (computeMerkleRoot(block.transactions) !== block.merkleRoot) {
+      return { valid: false, brokenAt: block.blockNumber };
+    }
+
+    const expected = hashString(
+      serializeHeader(
+        block.blockNumber,
+        block.previousHash,
+        block.merkleRoot,
+        block.timestamp,
+        block.miner,
+        block.gasUsed,
+        block.nonce
+      )
+    );
+    if (expected !== block.hash) return { valid: false, brokenAt: block.blockNumber };
+
+    if (i > 0 && block.previousHash !== chain[i - 1].hash) {
+      return { valid: false, brokenAt: block.blockNumber };
+    }
+  }
+  return { valid: true, brokenAt: null };
+}
+
+/* ───────────────────────────────────────────
+   Genesis chain — mined once, deterministically
+   ─────────────────────────────────────────── */
+
+export const FACTORY_ADDRESS = "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7";
+export const TECHNICIAN_ADDRESS = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
+export const USER_ADDRESS = "0x71C8F79B3564d6B690E8FfE93A9e917A00644a9B";
+const GENESIS_NODE = `${ZERO_ADDRESS} (HardWAve Genesis Node)`;
+
+const DAY_MS = 24 * 3600 * 1000;
+/** Fixed epoch so the genesis chain hashes identically on every device. */
+const GENESIS_EPOCH = Date.UTC(2025, 0, 1);
+
+/**
+ * Nonces for the three genesis blocks. Their timestamps and payloads are fixed
+ * constants, so the proof-of-work answer is too — baking it in keeps the ~1 s
+ * of hashing off the page-load path. If any genesis content is ever edited the
+ * cached nonce simply stops validating and the block is re-mined on the spot.
+ */
+const GENESIS_NONCES = [11353, 12178, 69834] as const;
+
+function sealBlock(
+  blockNumber: number,
+  previousHash: string,
+  timestamp: number,
+  miner: string,
+  drafts: Omit<Transaction, "txHash">[],
+  cachedNonce?: number
+): Block {
+  const transactions: Transaction[] = drafts.map((draft) => ({
+    ...draft,
+    txHash: computeTxHash(draft),
+  }));
+  const merkleRoot = computeMerkleRoot(transactions);
+  const gasUsed = 21000 + transactions.length * 45000;
+
+  const sealed = (() => {
+    if (cachedNonce !== undefined) {
+      const hash = hashString(
+        serializeHeader(
+          blockNumber,
+          previousHash,
+          merkleRoot,
+          timestamp,
+          miner,
+          gasUsed,
+          cachedNonce
+        )
+      );
+      if (hash.startsWith(`0x${"0".repeat(POW_DIFFICULTY)}`)) {
+        return { hash, nonce: cachedNonce };
+      }
+    }
+    return mineHeader(blockNumber, previousHash, merkleRoot, timestamp, miner, gasUsed);
+  })();
+
+  const { hash, nonce } = sealed;
+
+  return {
+    blockNumber,
+    hash,
+    previousHash,
+    merkleRoot,
+    nonce,
+    timestamp,
+    transactions,
+    miner,
+    gasUsed,
+  };
+}
+
+function buildGenesisChain(): Block[] {
+  const genesis = sealBlock(
+    0,
+    ZERO_HASH,
+    GENESIS_EPOCH,
+    GENESIS_NODE,
+    [
       {
-        txHash: "0xgenesis_tx_00000000000000000000000000000000000000000000000000000000",
         type: "MINT",
-        from: "0x0000000000000000000000000000000000000000",
-        to: "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
+        from: ZERO_ADDRESS,
+        to: FACTORY_ADDRESS,
         details: "HardWAve Sovereign EVM Genesis Protocol Initialized",
-        timestamp: Date.now() - 30 * 24 * 3600 * 1000,
+        timestamp: GENESIS_EPOCH,
       },
     ],
-  },
-  {
-    blockNumber: 1,
-    hash: "0x00004e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d",
-    previousHash: "0x00008f1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e90",
-    merkleRoot: "0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b",
-    nonce: 89312,
-    timestamp: Date.now() - 15 * 24 * 3600 * 1000,
-    miner: "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
-    gasUsed: 145000,
-    transactions: [
+    GENESIS_NONCES[0]
+  );
+
+  const factoryMint = sealBlock(
+    1,
+    genesis.hash,
+    GENESIS_EPOCH + 15 * DAY_MS,
+    FACTORY_ADDRESS,
+    [
       {
-        txHash: "0x7f9a2b8c4d1e3f6a5b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a",
         type: "MINT",
-        from: "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
-        to: "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
+        from: FACTORY_ADDRESS,
+        to: FACTORY_ADDRESS,
         tokenId: 1,
         serialNumber: "HW-RTX3090-88421",
         hardwareName: "NVIDIA RTX 3090 Founders Edition",
         amountETH: 0,
         details: "Factory Genesis Token Minted with 36-Month Warranty",
-        timestamp: Date.now() - 15 * 24 * 3600 * 1000,
+        timestamp: GENESIS_EPOCH + 15 * DAY_MS,
       },
     ],
-  },
-  {
-    blockNumber: 2,
-    hash: "0x0000a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0",
-    previousHash: "0x00004e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d",
-    merkleRoot: "0x1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f",
-    nonce: 63219,
-    timestamp: Date.now() - 5 * 24 * 3600 * 1000,
-    miner: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-    gasUsed: 92000,
-    transactions: [
+    GENESIS_NONCES[1]
+  );
+
+  const serviceLog = sealBlock(
+    2,
+    factoryMint.hash,
+    GENESIS_EPOCH + 25 * DAY_MS,
+    TECHNICIAN_ADDRESS,
+    [
       {
-        txHash: "0x2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c",
         type: "SERVICE",
-        from: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-        to: "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
+        from: TECHNICIAN_ADDRESS,
+        to: FACTORY_ADDRESS,
         tokenId: 1,
         serialNumber: "HW-RTX3090-88421",
         hardwareName: "NVIDIA RTX 3090 Founders Edition",
         amountETH: 0.02,
         details: "Service Workshop Logged: OEM Fan Assembly Replacement • IPFS: QmYwAPJzv5...",
-        timestamp: Date.now() - 5 * 24 * 3600 * 1000,
+        timestamp: GENESIS_EPOCH + 25 * DAY_MS,
       },
     ],
-  },
-];
+    GENESIS_NONCES[2]
+  );
+
+  return [genesis, factoryMint, serviceLog];
+}
+
+/* ───────────────────────────────────────────
+   Wallet & marketplace economics
+   ─────────────────────────────────────────── */
+
+export const INITIAL_BALANCE_ETH = 8.5;
+export const INITIAL_BALANCE_HWAVE = 420;
+/** HWAVE loyalty tokens credited per ETH spent in the autonomous marketplace. */
+const HWAVE_REWARD_PER_ETH = 100;
+
+/** Marketplace price index (ETH), keyed by physical serial number. */
+export const HARDWARE_PRICES: Record<string, number> = {
+  "HW-RTX3090-88421": 0.45,
+  "HW-SAM980P-51203": 0.06,
+  "HW-RAM32GB-77192": 0.03,
+  "HW-NZXTZ490-10492": 0.08,
+  "HW-RGBFAN-33910": 0.015,
+};
+
+/** Fallback pricing for hardware minted at runtime, by category. */
+const CATEGORY_FALLBACK_PRICES: Record<string, number> = {
+  GPU: 0.45,
+  Motherboard: 0.08,
+  SSD: 0.06,
+  RAM: 0.03,
+  Cooling: 0.015,
+};
+
+/** Resolves a listing price, falling back to the category index for fresh mints. */
+export function priceOf(
+  prices: Record<string, number>,
+  serialNumber: string,
+  category?: string
+): number {
+  return (
+    prices[serialNumber] ??
+    (category ? CATEGORY_FALLBACK_PRICES[category] : undefined) ??
+    0.05
+  );
+}
+
+interface UserWallet {
+  address: string;
+  balanceETH: number;
+  balanceHWAVE: number;
+  ownedTokens: number[];
+}
+
+function freshWallet(): UserWallet {
+  return {
+    address: USER_ADDRESS,
+    balanceETH: INITIAL_BALANCE_ETH,
+    balanceHWAVE: INITIAL_BALANCE_HWAVE,
+    ownedTokens: [],
+  };
+}
 
 interface BlockchainState {
   chain: Block[];
   selectedBlockNumber: number | null;
-  userWallet: {
-    address: string;
-    balanceETH: number;
-    balanceHWAVE: number;
-    ownedTokens: number[];
-  };
-  hardwarePrices: Record<string, number>; // Serial => Price in ETH
+  userWallet: UserWallet;
+  hardwarePrices: Record<string, number>;
 
-  // Actions
   setSelectedBlockNumber: (blockNum: number | null) => void;
-  mineBlock: (transactions: Transaction[]) => Block;
-  purchaseHardware: (tokenId: number, serialNumber: string, hardwareName: string, priceETH: number) => boolean;
+  mineBlock: (drafts: Omit<Transaction, "txHash">[]) => Block;
   addTransactionAndMine: (tx: Omit<Transaction, "txHash" | "timestamp">) => Block;
+  purchaseHardware: (
+    tokenId: number,
+    serialNumber: string,
+    hardwareName: string,
+    priceETH: number
+  ) => boolean;
+  setPrice: (serialNumber: string, priceETH: number) => void;
+  resetChain: () => void;
+}
+
+function freshState() {
+  return {
+    chain: buildGenesisChain(),
+    selectedBlockNumber: 2,
+    userWallet: freshWallet(),
+    hardwarePrices: { ...HARDWARE_PRICES },
+  };
 }
 
 export const useBlockchainEngine = create<BlockchainState>()(
   persist(
     (set, get) => ({
-      chain: INITIAL_GENESIS_CHAIN,
-      selectedBlockNumber: 2,
-      userWallet: {
-        address: "0x71C8F79B3564d6B690E8FfE93A9e917A00644a9B",
-        balanceETH: 8.50,
-        balanceHWAVE: 420.0,
-        ownedTokens: [],
-      },
-      hardwarePrices: {
-        "HW-RTX3090-88421": 0.45,
-        "HW-SAM980P-51203": 0.06,
-        "HW-RAM32GB-77192": 0.03,
-        "HW-NZXTZ490-10492": 0.08,
-        "HW-RGBFAN-33910": 0.015,
-      },
+      ...freshState(),
 
       setSelectedBlockNumber: (num) => set({ selectedBlockNumber: num }),
 
-      mineBlock: (transactions) => {
-        const chain = get().chain;
-        const previousBlock = chain[chain.length - 1];
-        const newBlockNum = previousBlock.blockNumber + 1;
-        const now = Date.now();
-        const nonce = Math.floor(10000 + Math.random() * 90000);
-        
-        const rawString = `${newBlockNum}${previousBlock.hash}${now}${transactions.length}${nonce}`;
-        const newHash = pseudoSha256(rawString);
-        const merkle = pseudoSha256(`merkle_${now}_${transactions.length}`);
-
-        const newBlock: Block = {
-          blockNumber: newBlockNum,
-          hash: newHash,
-          previousHash: previousBlock.hash,
-          merkleRoot: merkle,
-          nonce,
-          timestamp: now,
-          transactions,
-          miner: get().userWallet.address,
-          gasUsed: 21000 + transactions.length * 45000,
-        };
+      mineBlock: (drafts) => {
+        const { chain, userWallet } = get();
+        const parent = chain[chain.length - 1];
+        const newBlock = sealBlock(
+          parent.blockNumber + 1,
+          parent.hash,
+          Date.now(),
+          userWallet.address,
+          drafts
+        );
 
         set((state) => ({
           chain: [...state.chain, newBlock],
-          selectedBlockNumber: newBlockNum,
+          selectedBlockNumber: newBlock.blockNumber,
         }));
 
         return newBlock;
       },
 
-      addTransactionAndMine: (txData) => {
-        const tx: Transaction = {
-          ...txData,
-          txHash: pseudoSha256(`tx_${Date.now()}_${Math.random()}`),
-          timestamp: Date.now(),
-        };
-        return get().mineBlock([tx]);
-      },
+      addTransactionAndMine: (txData) => get().mineBlock([{ ...txData, timestamp: Date.now() }]),
 
       purchaseHardware: (tokenId, serialNumber, hardwareName, priceETH) => {
         const wallet = get().userWallet;
+        if (wallet.ownedTokens.includes(tokenId)) return false;
         if (wallet.balanceETH < priceETH) return false;
 
-        const newBalance = parseFloat((wallet.balanceETH - priceETH).toFixed(4));
-        const newOwned = Array.from(new Set([...wallet.ownedTokens, tokenId]));
-
-        const tx: Transaction = {
-          txHash: pseudoSha256(`purchase_${serialNumber}_${Date.now()}`),
-          type: "PURCHASE",
-          from: "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7 (Factory)",
-          to: wallet.address,
-          tokenId,
-          serialNumber,
-          hardwareName,
-          amountETH: priceETH,
-          details: `Direct Autonomous Purchase of ${hardwareName} (Token #${tokenId}) • Ownership Transferred to Buyer`,
-          timestamp: Date.now(),
-        };
-
-        get().mineBlock([tx]);
-
-        set({
-          userWallet: {
-            ...wallet,
-            balanceETH: newBalance,
-            ownedTokens: newOwned,
+        get().mineBlock([
+          {
+            type: "PURCHASE",
+            from: `${FACTORY_ADDRESS} (Factory)`,
+            to: wallet.address,
+            tokenId,
+            serialNumber,
+            hardwareName,
+            amountETH: priceETH,
+            details: `Direct Autonomous Purchase of ${hardwareName} (Token #${tokenId}) • Ownership Transferred to Buyer`,
+            timestamp: Date.now(),
           },
-        });
+        ]);
+
+        set((state) => ({
+          userWallet: {
+            ...state.userWallet,
+            balanceETH: parseFloat((state.userWallet.balanceETH - priceETH).toFixed(4)),
+            balanceHWAVE: parseFloat(
+              (state.userWallet.balanceHWAVE + priceETH * HWAVE_REWARD_PER_ETH).toFixed(2)
+            ),
+            ownedTokens: [...state.userWallet.ownedTokens, tokenId],
+          },
+        }));
 
         return true;
       },
+
+      setPrice: (serialNumber, priceETH) =>
+        set((state) => ({
+          hardwarePrices: { ...state.hardwarePrices, [serialNumber]: priceETH },
+        })),
+
+      resetChain: () => set(freshState()),
     }),
     {
       name: "hardwave-blockchain-engine",
+      version: 2,
+      // v1 persisted placeholder digests; rebuild so the chain verifies cryptographically.
+      migrate: () => freshState(),
     }
   )
 );

@@ -7,6 +7,8 @@ import * as THREE from "three";
 import { Cpu, Boxes, Wrench, QrCode, Layers, Sparkles } from "lucide-react";
 import { getTerrainHeight } from "@/utils/terrainPhysics";
 import { THEME } from "@/theme/designSystem";
+import { liveTelemetry, useWorldTelemetry } from "@/store/worldTelemetry";
+import { useHardwareStore } from "@/store/hardwareStore";
 
 export interface StationDef {
   id: string;
@@ -62,7 +64,7 @@ export const STATIONS: StationDef[] = [
   },
   {
     id: "showroom",
-    label: "Hardware Gallery",
+    label: "Hardware Showroom",
     iconName: "showroom",
     position: [22, 0, 18],
     modelPath: "/models/motherboard.glb",
@@ -93,10 +95,13 @@ export function StationIcon({ name, size = 18, color }: { name: string; size?: n
 function PavilionPedestal({
   station,
   isNear,
+  showBadge,
   lampMultiplier = 1,
 }: {
   station: StationDef;
   isNear: boolean;
+  /** Suppressed while a modal is open — drei portals Html above the canvas. */
+  showBadge: boolean;
   lampMultiplier?: number;
 }) {
   const modelRef = useRef<THREE.Group>(null);
@@ -213,15 +218,17 @@ function PavilionPedestal({
       />
 
       {/* Floating 3D Info Badge when Player is Near */}
-      {isNear && (
+      {isNear && showBadge && (
         <Html
           position={[0, 6.4, 0]}
           center
           distanceFactor={22}
+          // Keep the billboard beneath the z-50 modal layer.
+          zIndexRange={[20, 0]}
           style={{ pointerEvents: "none" }}
         >
           <div
-            className="px-5 py-3 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl animate-in fade-in zoom-in-95 duration-200 select-none"
+            className="px-5 py-3 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl hw-zoom-in select-none"
             style={{
               background: THEME.colors.glass.bgElevated,
               borderColor: station.color,
@@ -349,46 +356,42 @@ function ProceduralHardwareHologram({ color = "#38bdf8" }: { color?: string }) {
 }
 
 interface ParkPavilionsProps {
-  buggyPosition: THREE.Vector3;
   lampMultiplier?: number;
-  onStationEnter?: (station: StationDef) => void;
-  onStationLeave?: () => void;
 }
 
-export default function ParkPavilions({
-  buggyPosition,
-  lampMultiplier = 1,
-  onStationEnter,
-  onStationLeave,
-}: ParkPavilionsProps) {
-  const activeStation = useRef<string | null>(null);
+/** Radius around a plinth in which the interaction prompt appears. */
+const STATION_TRIGGER_RADIUS = 8.8;
 
-  const nearStations = STATIONS.map((station) => {
-    const dx = buggyPosition.x - station.position[0];
-    const dz = buggyPosition.z - station.position[2];
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    const isNear = dist < 8.8; // Generous trigger zone
+export default function ParkPavilions({ lampMultiplier = 1 }: ParkPavilionsProps) {
+  const nearStationId = useWorldTelemetry((s) => s.nearStationId);
+  const modalOpen = useHardwareStore((s) => s.activeModal !== null);
 
-    if (isNear && activeStation.current !== station.id) {
-      activeStation.current = station.id;
-      onStationEnter?.(station);
+  // Proximity is evaluated in the render loop against the mutable telemetry
+  // mirror, so it costs nothing until the buggy actually crosses a boundary.
+  useFrame(() => {
+    const { x, z } = liveTelemetry.position;
+
+    let entered: string | null = null;
+    for (const station of STATIONS) {
+      const dx = x - station.position[0];
+      const dz = z - station.position[2];
+      if (dx * dx + dz * dz < STATION_TRIGGER_RADIUS * STATION_TRIGGER_RADIUS) {
+        entered = station.id;
+        break;
+      }
     }
 
-    return { station, isNear };
+    useWorldTelemetry.getState().setNearStation(entered);
   });
-
-  if (!nearStations.some((s) => s.isNear) && activeStation.current) {
-    activeStation.current = null;
-    onStationLeave?.();
-  }
 
   return (
     <group>
-      {nearStations.map(({ station, isNear }) => (
+      {STATIONS.map((station) => (
         <PavilionPedestal
           key={station.id}
           station={station}
-          isNear={isNear}
+          isNear={nearStationId === station.id}
+          showBadge={!modalOpen}
           lampMultiplier={lampMultiplier}
         />
       ))}
