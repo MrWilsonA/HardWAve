@@ -75,6 +75,7 @@ export default function Home() {
         dayNight={dayNight}
         activeStation={activeStation}
         onTeleport={handleTeleport}
+        speed={speed}
       />
 
       {/* HUD: Bottom-Left Speedometer, Bottom-Right GPS Radar, Bottom-Center Station Interaction Card */}

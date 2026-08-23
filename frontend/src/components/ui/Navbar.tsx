@@ -23,9 +23,10 @@ interface NavbarProps {
   dayNight: DayNightState;
   activeStation: StationDef | null;
   onTeleport: (stationId: string) => void;
+  speed?: number;
 }
 
-export default function Navbar({ dayNight, activeStation, onTeleport }: NavbarProps) {
+export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 }: NavbarProps) {
   const [connected, setConnected] = useState(false);
   const [account, setAccount] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(false);
@@ -279,7 +280,7 @@ export default function Navbar({ dayNight, activeStation, onTeleport }: NavbarPr
           </div>
 
           {/* 3. Sound & BGM Settings Icon Button */}
-          <SoundController />
+          <SoundController isNight={dayNight.isNight} speed={speed} />
 
           {/* 4. Connect Wallet Button */}
           <button
