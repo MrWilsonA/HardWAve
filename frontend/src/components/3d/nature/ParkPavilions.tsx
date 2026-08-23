@@ -260,25 +260,27 @@ function PavilionPedestal({
 /* ───────────────────────────────────────────
    Auto-Normalizing GLTF Hardware Model
    – Computes accurate 3D bounding box
-   – Centers geometry perfectly to (0, 0, 0)
+   – Wraps in isolated container & centers geometry perfectly to (0, 0, 0)
    – Normalizes max dimension to targetSize (1.6m - 1.8m)
-   – Ensures crisp shadows and proportional pavilion fit
+   – Sets double-sided materials & crisp shadow casting
    ─────────────────────────────────────────── */
 function NormalizedGLBModel({ path, targetSize = 1.65 }: { path: string; targetSize?: number }) {
   const { scene } = useGLTF(path);
 
-  const { normalizedScene, calculatedScale } = useMemo(() => {
+  const { wrapperGroup, calculatedScale } = useMemo(() => {
     const clone = scene.clone(true);
+    
+    // Compute bounding box
     const box = new THREE.Box3().setFromObject(clone);
     const size = new THREE.Vector3();
     box.getSize(size);
     const center = new THREE.Vector3();
     box.getCenter(center);
 
-    // Center pivot point to (0, 0, 0)
-    clone.position.sub(center);
+    // Offset cloned model inside wrapper so center is exactly at (0, 0, 0)
+    clone.position.set(-center.x, -center.y, -center.z);
 
-    // Scale precisely so max dimension matches targetSize
+    // Scale factor so max dimension matches targetSize
     const maxDim = Math.max(size.x, size.y, size.z);
     const s = targetSize / (maxDim > 0.001 ? maxDim : 1);
 
@@ -286,16 +288,31 @@ function NormalizedGLBModel({ path, targetSize = 1.65 }: { path: string; targetS
       if ((child as THREE.Mesh).isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
+        const mesh = child as THREE.Mesh;
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((m) => {
+              m.side = THREE.DoubleSide;
+              m.depthWrite = true;
+            });
+          } else {
+            mesh.material.side = THREE.DoubleSide;
+            mesh.material.depthWrite = true;
+          }
+        }
       }
     });
 
-    return { normalizedScene: clone, calculatedScale: s };
+    const wrapper = new THREE.Group();
+    wrapper.add(clone);
+
+    return { wrapperGroup: wrapper, calculatedScale: s };
   }, [scene, targetSize]);
 
   return (
     <Float speed={2.2} rotationIntensity={0.2} floatIntensity={0.35}>
-      <group rotation={[0.22, 0, 0]}>
-        <primitive object={normalizedScene} scale={calculatedScale} />
+      <group scale={calculatedScale} rotation={[0.22, 0, 0]}>
+        <primitive object={wrapperGroup} />
       </group>
     </Float>
   );
@@ -378,3 +395,8 @@ export default function ParkPavilions({
     </group>
   );
 }
+
+// Preload all 5 hardware GLTF models
+STATIONS.forEach((s) => {
+  useGLTF.preload(s.modelPath);
+});
