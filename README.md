@@ -118,23 +118,38 @@ git clone https://github.com/MrWilsonA/HardWAve.git
 cd HardWAve
 ```
 
-### 2. Install Dependencies
+### Option A: Local Development
+
 ```bash
-# Install root, frontend, and contracts dependencies
+# 1. Install dependencies
 npm install --prefix contracts
 npm install --prefix frontend
-```
 
-### 3. Run Smart Contract Tests
-```bash
+# 2. Run smart contract tests
 npm run test:contracts
-```
 
-### 4. Run Frontend Development Server
-```bash
+# 3. Start Next.js 3D development server
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser to view the interactive 3D splash page.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Option B: Docker Compose (All-In-One Containerization) 🐳
+
+Run the entire ecosystem (Next.js Frontend, Local Blockchain EVM Node, and PostgreSQL) with a single command:
+
+```bash
+# Build and run containers in background
+docker compose up -d --build
+
+# View running services
+docker compose ps
+
+# Stop containers
+docker compose down
+```
+- **Frontend App**: `http://localhost:3000`
+- **EVM Blockchain RPC**: `http://localhost:8545`
+- **PostgreSQL Database**: `localhost:5432`
 
 ---
 
