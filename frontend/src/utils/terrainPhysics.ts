@@ -12,8 +12,8 @@ export interface Obstacle {
 }
 
 export const OBSTACLES: Obstacle[] = [
-  // Grand Oak centerpiece
-  { x: 0, z: 0, radius: 2.2 },     // Central Grand Oak trunk
+  // Grand Oak centerpiece (enlarged majestic trunk)
+  { x: 0, z: 0, radius: 2.8 },     // Central Grand Oak trunk & flared roots
   // Pavilions (radius 4.5)
   { x: -16, z: -16, radius: 4.2 }, // GPU Lab
   { x: 20, z: -16, radius: 4.2 },  // Blockchain Vault

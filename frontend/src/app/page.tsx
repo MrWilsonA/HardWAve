@@ -90,6 +90,8 @@ export default function Home() {
       <Canvas
         shadows={{ type: THREE.PCFSoftShadowMap }}
         camera={{ position: [0, 10.5, 15.5], fov: 48, near: 0.5, far: 3500 }}
+        dpr={[1, 1.5]}
+        performance={{ min: 0.5 }}
         gl={{
           antialias: true,
           powerPreference: "high-performance",

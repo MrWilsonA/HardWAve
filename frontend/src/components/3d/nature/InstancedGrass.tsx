@@ -145,23 +145,17 @@ export default function InstancedGrass({
     }
   }, [grassInstances, flowerInstances, dummy, tempColor]);
 
-  // Wind sway animation – subtle per-frame tilt of grass blades
+  // Wind sway animation – subtle, high-performance group sway
   useFrame((state) => {
-    if (!grassMeshRef.current) return;
     const t = state.clock.elapsedTime;
-
-    grassInstances.forEach((data, i) => {
-      dummy.position.set(...data.position);
-      // Base rotation + wind sway
-      const windPhase = data.position[0] * 0.15 + data.position[2] * 0.12 + t * 1.2;
-      const swayZ = Math.sin(windPhase) * 0.12 * data.scale;
-      const swayX = Math.cos(windPhase * 0.7) * 0.06 * data.scale;
-      dummy.rotation.set(swayX, data.rotation, swayZ);
-      dummy.scale.set(data.scale, data.scale, data.scale);
-      dummy.updateMatrix();
-      grassMeshRef.current!.setMatrixAt(i, dummy.matrix);
-    });
-    grassMeshRef.current.instanceMatrix.needsUpdate = true;
+    if (grassMeshRef.current) {
+      grassMeshRef.current.rotation.z = Math.sin(t * 1.4) * 0.015;
+      grassMeshRef.current.rotation.x = Math.cos(t * 1.1) * 0.01;
+    }
+    if (flowerMeshRef.current) {
+      flowerMeshRef.current.rotation.z = Math.sin(t * 1.2 + 1) * 0.012;
+      flowerMeshRef.current.rotation.x = Math.cos(t * 0.9 + 1) * 0.008;
+    }
   });
 
   // Low-poly blade geometry
