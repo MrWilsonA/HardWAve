@@ -9,10 +9,11 @@ import {
   Pause,
   Music,
   Trees,
-  Sparkles,
   Sun,
   Moon,
   Wind,
+  CloudRain,
+  CloudSun,
 } from "lucide-react";
 import { THEME } from "@/theme/designSystem";
 import { natureAudio } from "@/utils/natureAudio";
@@ -20,13 +21,20 @@ import { natureAudio } from "@/utils/natureAudio";
 interface SoundControllerProps {
   isNight?: boolean;
   speed?: number;
+  isRaining?: boolean;
+  onToggleRain?: () => void;
 }
 
-export default function SoundController({ isNight = false, speed = 0 }: SoundControllerProps) {
+export default function SoundController({
+  isNight = false,
+  speed = 0,
+  isRaining = false,
+  onToggleRain,
+}: SoundControllerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [bgmVolume, setBgmVolume] = useState(0.40);
-  const [natureVolume, setNatureVolume] = useState(0.55);
+  const [bgmVolume, setBgmVolume] = useState(0.22);
+  const [natureVolume, setNatureVolume] = useState(0.28);
   const [natureEnabled, setNatureEnabled] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -53,10 +61,10 @@ export default function SoundController({ isNight = false, speed = 0 }: SoundCon
         if (natureAudio) {
           natureAudio.init();
           natureAudio.setVolume(natureVolume);
-          natureAudio.update(isNight, speed);
+          natureAudio.update(isNight, speed, isRaining);
         }
 
-        // Start BGM & Nature Audio
+        // Start BGM & Nature Audio smoothly
         audio.play().then(() => setIsPlaying(true)).catch(() => {});
         natureTrack.play().catch(() => {});
       }
@@ -90,13 +98,13 @@ export default function SoundController({ isNight = false, speed = 0 }: SoundCon
     }
   }, [natureVolume, isMuted, natureEnabled]);
 
-  // Sync Nature Audio Volume, Day/Night, and Driving Speed
+  // Sync Nature Audio Volume, Day/Night, Rain Weather, and Driving Speed
   useEffect(() => {
     if (natureAudio) {
       natureAudio.setVolume(isMuted || !natureEnabled ? 0 : natureVolume);
-      natureAudio.update(isNight, speed);
+      natureAudio.update(isNight, speed, isRaining);
     }
-  }, [natureVolume, natureEnabled, isMuted, isNight, speed]);
+  }, [natureVolume, natureEnabled, isMuted, isNight, speed, isRaining]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -157,7 +165,7 @@ export default function SoundController({ isNight = false, speed = 0 }: SoundCon
       {/* Sound Settings Popover */}
       {isOpen && (
         <div
-          className="absolute top-12 right-0 w-[265px] p-4 rounded-3xl border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 select-none space-y-3.5"
+          className="absolute top-12 right-0 w-[275px] p-4 rounded-3xl border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 select-none space-y-3.5"
           style={{
             background: THEME.colors.glass.bgElevated,
             borderColor: THEME.colors.glass.border,
@@ -170,7 +178,7 @@ export default function SoundController({ isNight = false, speed = 0 }: SoundCon
             <div className="flex items-center gap-2">
               <Trees className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-black uppercase tracking-wider text-white">
-                Sound System
+                Audio System
               </span>
             </div>
             <span
@@ -205,7 +213,7 @@ export default function SoundController({ isNight = false, speed = 0 }: SoundCon
               </div>
               <div className="truncate">
                 <p className="text-[11px] font-bold text-white truncate">Lanterns Over Fernvale</p>
-                <p className="text-[9px] text-emerald-400 font-medium">Isekai Adventure BGM</p>
+                <p className="text-[9px] text-emerald-400 font-medium">Isekai OST (Loop)</p>
               </div>
             </div>
 
@@ -259,7 +267,7 @@ export default function SoundController({ isNight = false, speed = 0 }: SoundCon
           <div className="space-y-1 pt-1">
             <div className="flex justify-between items-center text-[10px] font-mono">
               <span className="text-slate-400 flex items-center gap-1">
-                <Wind size={11} className="text-emerald-400" /> Nature Ambience
+                <Wind size={11} className="text-emerald-400" /> Nature & Rain SFX
               </span>
               <span className="text-emerald-400 font-bold">
                 {!natureEnabled || isMuted ? "0%" : `${Math.round(natureVolume * 100)}%`}
@@ -280,20 +288,41 @@ export default function SoundController({ isNight = false, speed = 0 }: SoundCon
             />
           </div>
 
-          {/* 4. Live Environment Audio Status */}
-          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono">
-            <span className="text-slate-400">Environment</span>
-            <div className="flex items-center gap-1 font-bold text-emerald-300">
-              {isNight ? (
-                <>
-                  <Moon size={11} className="text-indigo-400" /> Crickets & Night Breeze
-                </>
+          {/* 4. Weather Rain Toggle & Status */}
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-300">
+              {isRaining ? (
+                <span className="flex items-center gap-1 text-sky-400 font-bold">
+                  <CloudRain size={12} className="animate-bounce" /> Rainy Weather SFX
+                </span>
+              ) : isNight ? (
+                <span className="flex items-center gap-1 text-indigo-300 font-bold">
+                  <Moon size={12} /> Crickets & Night Breeze
+                </span>
               ) : (
-                <>
-                  <Sun size={11} className="text-amber-400" /> Forest Birdsong & Wind
-                </>
+                <span className="flex items-center gap-1 text-amber-300 font-bold">
+                  <Sun size={12} /> Birds & Forest Breeze
+                </span>
               )}
             </div>
+
+            {onToggleRain && (
+              <button
+                onClick={onToggleRain}
+                className="flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-bold border transition-all active:scale-95 cursor-pointer"
+                style={{
+                  background: isRaining
+                    ? "linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(3, 105, 161, 0.9))"
+                    : "rgba(255, 255, 255, 0.08)",
+                  borderColor: isRaining ? "#38bdf8" : "rgba(255, 255, 255, 0.15)",
+                  color: isRaining ? "#7dd3fc" : "#cbd5e1",
+                }}
+                title={isRaining ? "Stop Rain" : "Make it Rain"}
+              >
+                {isRaining ? <CloudSun size={11} /> : <CloudRain size={11} />}
+                <span>{isRaining ? "Clear" : "Rain"}</span>
+              </button>
+            )}
           </div>
         </div>
       )}

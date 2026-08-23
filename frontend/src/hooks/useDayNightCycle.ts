@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 
-export const DAY_NIGHT_DURATION_SECONDS = 600; // 10 minutes full cycle
+// 1 Real Minute = 1 In-Game Hour (Full 24-hour cycle = 24 minutes = 1440 seconds)
+export const DAY_NIGHT_DURATION_SECONDS = 24 * 60;
 
 export interface DayNightState {
   progress: number; // 0.0 to 1.0
   timeString: string; // e.g. "14:30"
   isNight: boolean;
+  isRaining: boolean;
+  toggleRain: () => void;
   sunPosition: [number, number, number];
   moonPosition: [number, number, number];
   sunIntensity: number;
@@ -21,8 +24,9 @@ export interface DayNightState {
 }
 
 export function useDayNightCycle(customSpeedMultiplier: number = 1): DayNightState {
-  const [progress, setProgress] = useState<number>(0.2); // Start at morning ~10:48 AM
-  const progressRef = useRef<number>(0.2);
+  const [progress, setProgress] = useState<number>(0.25); // Start at morning ~12:00 PM
+  const [isRaining, setIsRaining] = useState<boolean>(false);
+  const progressRef = useRef<number>(0.25);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -43,6 +47,10 @@ export function useDayNightCycle(customSpeedMultiplier: number = 1): DayNightSta
     return () => cancelAnimationFrame(animationFrameId);
   }, [customSpeedMultiplier]);
 
+  const toggleRain = useCallback(() => {
+    setIsRaining((prev) => !prev);
+  }, []);
+
   // Calculate 24-hour time from progress (0 = 06:00 AM)
   const totalHours = (progress * 24 + 6) % 24;
   const hours = Math.floor(totalHours);
@@ -59,42 +67,44 @@ export function useDayNightCycle(customSpeedMultiplier: number = 1): DayNightSta
   const sunPosition: [number, number, number] = [sunX, sunY, sunZ];
   const moonPosition: [number, number, number] = [-sunX, -sunY, -sunZ];
 
-  // Night is when sun is below horizon (sunY < 0, roughly progress between 0.5 and 1.0)
+  // Night is when sun is below horizon (sunY < 2)
   const isNight = sunY < 2;
 
   // Day / Night interpolated parameters
-  let sunIntensity = Math.max(0, (sunY / sunRadius) * 2.8);
-  let ambientIntensity = 0.65;
-  let ambientColor = "#fff1d6";
-  let fogColor = "#fbd38d";
-  let skyRayleigh = 2.2;
-  let skyTurbidity = 8;
-  let lampIntensityMultiplier = 0.3; // Dim during day
+  let sunIntensity = Math.max(0, (sunY / sunRadius) * (isRaining ? 1.4 : 2.8));
+  let ambientIntensity = isRaining ? 0.45 : 0.65;
+  let ambientColor = isRaining ? "#cbd5e1" : "#fff1d6";
+  let fogColor = isRaining ? "#64748b" : "#fbd38d";
+  let skyRayleigh = isRaining ? 5.5 : 2.2;
+  let skyTurbidity = isRaining ? 18 : 8;
+  let lampIntensityMultiplier = isRaining ? 1.6 : 0.3;
 
   if (sunY < 10 && sunY >= -5) {
     // Sunset / Golden Hour / Twilight
-    sunIntensity = 1.2;
-    ambientIntensity = 0.5;
-    ambientColor = "#fca5a5";
-    fogColor = "#d97706";
-    skyRayleigh = 4.5;
-    skyTurbidity = 12;
-    lampIntensityMultiplier = 1.5;
+    sunIntensity = isRaining ? 0.6 : 1.2;
+    ambientIntensity = isRaining ? 0.35 : 0.5;
+    ambientColor = isRaining ? "#94a3b8" : "#fca5a5";
+    fogColor = isRaining ? "#475569" : "#d97706";
+    skyRayleigh = isRaining ? 6.0 : 4.5;
+    skyTurbidity = 14;
+    lampIntensityMultiplier = 2.0;
   } else if (sunY < -5) {
     // Deep Night
     sunIntensity = 0;
-    ambientIntensity = 0.22;
-    ambientColor = "#1e1b4b";
-    fogColor = "#0f172a";
+    ambientIntensity = isRaining ? 0.16 : 0.22;
+    ambientColor = isRaining ? "#0f172a" : "#1e1b4b";
+    fogColor = isRaining ? "#020617" : "#0f172a";
     skyRayleigh = 0.3;
-    skyTurbidity = 3;
-    lampIntensityMultiplier = 3.5; // High emissive glow at night
+    skyTurbidity = 4;
+    lampIntensityMultiplier = 3.8;
   }
 
   return {
     progress,
     timeString,
     isNight,
+    isRaining,
+    toggleRain,
     sunPosition,
     moonPosition,
     sunIntensity,

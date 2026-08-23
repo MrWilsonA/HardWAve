@@ -63,8 +63,8 @@ function GreenIslandGround() {
 /* Sandy Beach smoothly sloping into the ocean */
 function ShorelineBeach() {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
-      <ringGeometry args={[42.5, 48.5, 64]} />
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
+      <ringGeometry args={[41.5, 48.0, 72]} />
       <meshStandardMaterial
         color="#d4a373"
         flatShading

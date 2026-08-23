@@ -110,11 +110,11 @@ export default function NatureLighting({ dayNight }: NatureLightingProps) {
         castShadow
         shadow-mapSize-width={4096}
         shadow-mapSize-height={4096}
-        shadow-camera-far={160}
-        shadow-camera-left={-75}
-        shadow-camera-right={75}
-        shadow-camera-top={75}
-        shadow-camera-bottom={-75}
+        shadow-camera-far={180}
+        shadow-camera-left={-58}
+        shadow-camera-right={58}
+        shadow-camera-top={58}
+        shadow-camera-bottom={-58}
         shadow-bias={-0.0003}
         shadow-normalBias={0.03}
       />
@@ -128,11 +128,11 @@ export default function NatureLighting({ dayNight }: NatureLightingProps) {
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
-          shadow-camera-far={160}
-          shadow-camera-left={-75}
-          shadow-camera-right={75}
-          shadow-camera-top={75}
-          shadow-camera-bottom={-75}
+          shadow-camera-far={180}
+          shadow-camera-left={-58}
+          shadow-camera-right={58}
+          shadow-camera-top={58}
+          shadow-camera-bottom={-58}
           shadow-bias={-0.0003}
         />
       )}

@@ -280,7 +280,12 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
           </div>
 
           {/* 3. Sound & BGM Settings Icon Button */}
-          <SoundController isNight={dayNight.isNight} speed={speed} />
+          <SoundController
+            isNight={dayNight.isNight}
+            speed={speed}
+            isRaining={dayNight.isRaining}
+            onToggleRain={dayNight.toggleRain}
+          />
 
           {/* 4. Connect Wallet Button */}
           <button

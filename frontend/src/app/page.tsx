@@ -14,6 +14,7 @@ import LowPolyProps from "@/components/3d/nature/LowPolyProps";
 import InstancedGrass from "@/components/3d/nature/InstancedGrass";
 import GrandOak from "@/components/3d/nature/GrandOak";
 import WindParticles from "@/components/3d/nature/WindParticles";
+import RainWeather from "@/components/3d/nature/RainWeather";
 import RedBuggy from "@/components/3d/nature/RedBuggy";
 import ParkPavilions, {
   STATIONS,
@@ -121,6 +122,9 @@ export default function Home() {
 
           {/* Drifting Leaves & Atmospheric Pollen Particles */}
           <WindParticles isNight={dayNight.isNight} />
+
+          {/* Dynamic Rain Weather Streaks & Ground Ripples */}
+          <RainWeather isRaining={dayNight.isRaining} buggyPos={buggyPos} />
 
           {/* Red Off-Road Monster Buggy with Smooth Arcade Controls & Orbit Camera */}
           <RedBuggy
