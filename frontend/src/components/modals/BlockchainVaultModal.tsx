@@ -14,14 +14,20 @@ import {
   ExternalLink,
   QrCode,
   Lock,
+  GitBranch,
+  Coins,
 } from "lucide-react";
 import { THEME } from "@/theme/designSystem";
 import { useHardwareStore } from "@/store/hardwareStore";
+import { useBlockchainEngine } from "@/store/blockchainEngine";
+import BlockchainGraphExplorer from "@/components/blockchain/BlockchainGraphExplorer";
 
 export default function BlockchainVaultModal() {
   const { activeModal, setActiveModal, registerHardware, units, setActiveUnit } =
     useHardwareStore();
+  const { addTransactionAndMine, userWallet } = useBlockchainEngine();
 
+  const [activeTab, setActiveTab] = useState<"graph" | "mint">("graph");
   const [serial, setSerial] = useState("");
   const [modelName, setModelName] = useState("");
   const [category, setCategory] = useState<"GPU" | "Motherboard" | "SSD" | "RAM" | "Cooling">(
@@ -58,6 +64,18 @@ export default function BlockchainVaultModal() {
         warrantyMonths
       );
 
+      // Mine a new block on the sovereign blockchain graph!
+      addTransactionAndMine({
+        type: "MINT",
+        from: userWallet.address,
+        to: userWallet.address,
+        tokenId: newUnit.tokenId,
+        serialNumber: newUnit.serialNumber,
+        hardwareName: newUnit.modelName,
+        amountETH: 0,
+        details: `Factory Genesis Token Minted (${category}) • Serial: ${newUnit.serialNumber} • ${warrantyMonths}m Warranty`,
+      });
+
       setIsMinting(false);
       setMintSuccess(newUnit.serialNumber);
       setSerial("");
@@ -93,215 +111,244 @@ export default function BlockchainVaultModal() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-black text-white">Blockchain Vault & Genesis Minting</h2>
+                <h2 className="text-base font-black text-white">Sovereign Blockchain Vault & Graph</h2>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center gap-1">
-                  <Lock size={11} />
-                  <span>Manufacturer Role Authorized</span>
+                  <Coins size={11} />
+                  <span>Wallet: {userWallet.balanceETH} ETH</span>
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-mono">
-                Decentralized ERC-721 Hardware Identity & Warranty Provenance Protocol
+                Decentralized ERC-721 Hardware Identity, Autonomous Mining & DAG Graph
               </p>
             </div>
           </div>
 
-          <button
-            onClick={() => setActiveModal(null)}
-            className="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-          {/* Left Form: Factory Minting */}
-          <div className="flex-1 p-6 overflow-y-auto border-r border-white/10 space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-white">Mint New Hardware Identity</h3>
-                <p className="text-xs text-slate-400">
-                  Bind physical device serial numbers directly into immutable EVM tokens.
-                </p>
-              </div>
+          <div className="flex items-center gap-2">
+            {/* Tab Pills */}
+            <div className="flex items-center p-1 rounded-2xl bg-white/5 border border-white/10">
               <button
-                type="button"
-                onClick={generateRandomSerial}
-                className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                onClick={() => setActiveTab("graph")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === "graph"
+                    ? "bg-purple-500/25 text-purple-300 border border-purple-500/40 shadow-lg"
+                    : "text-slate-400 hover:text-white"
+                }`}
               >
-                <Sparkles size={13} />
-                <span>Auto-Fill Mock Spec</span>
+                <GitBranch size={13} />
+                <span>3D/2D Block Graph</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("mint")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === "mint"
+                    ? "bg-purple-500/25 text-purple-300 border border-purple-500/40 shadow-lg"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Plus size={13} />
+                <span>Genesis Minting</span>
               </button>
             </div>
 
-            {mintSuccess && (
-              <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-between text-emerald-300 text-xs animate-in zoom-in-95">
-                <div className="flex items-center gap-2.5">
-                  <CheckCircle2 size={18} className="text-emerald-400" />
+            <button
+              onClick={() => setActiveModal(null)}
+              className="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body Content */}
+        <div className="flex-1 p-6 overflow-hidden flex flex-col">
+          {activeTab === "graph" ? (
+            <BlockchainGraphExplorer />
+          ) : (
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden -m-6">
+              {/* Left Form: Factory Minting */}
+              <div className="flex-1 p-6 overflow-y-auto border-r border-white/10 space-y-5">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-bold">Hardware Successfully Registered On-Chain!</p>
-                    <p className="text-[11px] font-mono text-emerald-400/80">
-                      Token minted for Serial: {mintSuccess}
+                    <h3 className="text-sm font-bold text-white">Mint New Hardware Identity</h3>
+                    <p className="text-xs text-slate-400">
+                      Bind physical device serial numbers directly into immutable EVM tokens.
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={generateRandomSerial}
+                    className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Sparkles size={13} />
+                    <span>Auto-Fill Mock Spec</span>
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    const u = units.find((x) => x.serialNumber === mintSuccess);
-                    if (u) {
-                      setActiveUnit(u);
-                      setActiveModal("gpu_inspector");
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs hover:bg-emerald-400 transition-colors cursor-pointer"
-                >
-                  Inspect 3D Twin
-                </button>
-              </div>
-            )}
 
-            <form onSubmit={handleMint} className="space-y-4">
-              {/* Category */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  Hardware Category
-                </label>
-                <div className="grid grid-cols-5 gap-2">
-                  {(["GPU", "Motherboard", "SSD", "RAM", "Cooling"] as const).map((cat) => (
+                {mintSuccess && (
+                  <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-between text-emerald-300 text-xs animate-in zoom-in-95">
+                    <div className="flex items-center gap-2.5">
+                      <CheckCircle2 size={18} className="text-emerald-400" />
+                      <div>
+                        <p className="font-bold">Hardware Minted & Block Appended to Graph!</p>
+                        <p className="text-[11px] font-mono text-emerald-400/80">
+                          Token minted for Serial: {mintSuccess}
+                        </p>
+                      </div>
+                    </div>
                     <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setCategory(cat)}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        category === cat
-                          ? "bg-purple-500/25 border-purple-400 text-white"
-                          : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
-                      }`}
+                      onClick={() => {
+                        const u = units.find((x) => x.serialNumber === mintSuccess);
+                        if (u) {
+                          setActiveUnit(u);
+                          setActiveModal("gpu_inspector");
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs hover:bg-emerald-400 transition-colors cursor-pointer"
                     >
-                      {cat}
+                      Inspect 3D Twin
                     </button>
+                  </div>
+                )}
+
+                <form onSubmit={handleMint} className="space-y-4">
+                  {/* Category */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      Hardware Category
+                    </label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {(["GPU", "Motherboard", "SSD", "RAM", "Cooling"] as const).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setCategory(cat)}
+                          className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            category === cat
+                              ? "bg-purple-500/25 border-purple-400 text-white"
+                              : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Serial & Model */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Physical Serial Number (Barcode)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. HW-RTX3090-88421"
+                        value={serial}
+                        onChange={(e) => setSerial(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-mono focus:border-purple-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Hardware Model Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. RTX 3090 Founders Edition"
+                        value={modelName}
+                        onChange={(e) => setModelName(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs focus:border-purple-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Specs & Warranty */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Primary Spec (Capacity / Phases)
+                      </label>
+                      <input
+                        type="text"
+                        value={vramSpec}
+                        onChange={(e) => setVramSpec(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-mono focus:border-purple-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Warranty Duration (Months)
+                      </label>
+                      <input
+                        type="number"
+                        value={warrantyMonths}
+                        onChange={(e) => setWarrantyMonths(parseInt(e.target.value) || 36)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-mono focus:border-purple-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isMinting}
+                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black tracking-wider uppercase transition-all shadow-xl active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {isMinting ? (
+                      <>
+                        <Sparkles className="animate-spin" size={16} />
+                        <span>Mining Block to Sovereign Chain...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={16} />
+                        <span>Mint & Mine Block (Gasless)</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* Right List: On-Chain Registry Feed */}
+              <div className="w-full md:w-[360px] bg-black/40 p-6 flex flex-col overflow-y-auto space-y-4">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <span className="text-xs font-black uppercase tracking-wider text-white">
+                    Live On-Chain Registry
+                  </span>
+                  <span className="text-[10px] font-mono text-purple-400 font-bold">
+                    {units.length} Tokens
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 flex-1 overflow-y-auto pr-1">
+                  {units.map((u) => (
+                    <div
+                      key={u.tokenId}
+                      onClick={() => {
+                        setActiveUnit(u);
+                        setActiveModal(u.category === "GPU" ? "gpu_inspector" : "gallery");
+                      }}
+                      className="p-3.5 rounded-2xl bg-white/5 hover:bg-purple-500/15 border border-white/10 hover:border-purple-500/40 transition-all cursor-pointer group space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white group-hover:text-purple-300 truncate max-w-[180px]">
+                          {u.modelName}
+                        </span>
+                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-300">
+                          #{u.tokenId}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                        <span className="text-amber-300">{u.serialNumber}</span>
+                        <span className="text-emerald-400">{u.warrantyMonths}m Warranty</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
-
-              {/* Serial & Model */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                    Physical Serial Number (Barcode)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. HW-RTX3090-88421"
-                    value={serial}
-                    onChange={(e) => setSerial(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-mono focus:border-purple-400 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                    Hardware Model Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. RTX 3090 Founders Edition"
-                    value={modelName}
-                    onChange={(e) => setModelName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs focus:border-purple-400 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Specs & Warranty */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                    Primary Spec (Capacity / Phases)
-                  </label>
-                  <input
-                    type="text"
-                    value={vramSpec}
-                    onChange={(e) => setVramSpec(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-mono focus:border-purple-400 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                    Warranty Duration (Months)
-                  </label>
-                  <input
-                    type="number"
-                    value={warrantyMonths}
-                    onChange={(e) => setWarrantyMonths(parseInt(e.target.value) || 36)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-xs font-mono focus:border-purple-400 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isMinting}
-                className="w-full py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black tracking-wider uppercase transition-all shadow-xl active:scale-98 cursor-pointer flex items-center justify-center gap-2"
-              >
-                {isMinting ? (
-                  <>
-                    <Sparkles className="animate-spin" size={16} />
-                    <span>Broadcasting to Polygon Amoy...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus size={16} />
-                    <span>Mint Provenance Token (Gasless)</span>
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-
-          {/* Right List: On-Chain Registry Feed */}
-          <div className="w-full md:w-[360px] bg-black/40 p-6 flex flex-col overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <span className="text-xs font-black uppercase tracking-wider text-white">
-                Live On-Chain Registry
-              </span>
-              <span className="text-[10px] font-mono text-purple-400 font-bold">
-                {units.length} Tokens
-              </span>
             </div>
-
-            <div className="space-y-2.5 flex-1 overflow-y-auto pr-1">
-              {units.map((u) => (
-                <div
-                  key={u.tokenId}
-                  onClick={() => {
-                    setActiveUnit(u);
-                    setActiveModal(u.category === "GPU" ? "gpu_inspector" : "gallery");
-                  }}
-                  className="p-3.5 rounded-2xl bg-white/5 hover:bg-purple-500/15 border border-white/10 hover:border-purple-500/40 transition-all cursor-pointer group space-y-1.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white group-hover:text-purple-300 truncate max-w-[180px]">
-                      {u.modelName}
-                    </span>
-                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-300">
-                      #{u.tokenId}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                    <span className="text-amber-300">{u.serialNumber}</span>
-                    <span className="text-emerald-400">{u.warrantyMonths}m Warranty</span>
-                  </div>
-                  {u.repairHistory.length > 0 && (
-                    <span className="inline-block text-[9px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
-                      {u.repairHistory.length} Service Logged
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

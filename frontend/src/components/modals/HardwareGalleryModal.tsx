@@ -15,9 +15,12 @@ import {
   ExternalLink,
   Info,
   Sparkles,
+  ShoppingBag,
+  Coins,
 } from "lucide-react";
 import { THEME } from "@/theme/designSystem";
 import { useHardwareStore, HardwareUnit } from "@/store/hardwareStore";
+import { useBlockchainEngine } from "@/store/blockchainEngine";
 
 function DynamicGallery3DModel({ modelPath }: { modelPath: string }) {
   const { scene } = useGLTF(modelPath);
@@ -66,10 +69,26 @@ function DynamicGallery3DModel({ modelPath }: { modelPath: string }) {
 
 export default function HardwareGalleryModal() {
   const { activeModal, setActiveModal, units, activeUnit, setActiveUnit } = useHardwareStore();
+  const { purchaseHardware, userWallet, hardwarePrices } = useBlockchainEngine();
+
   const [selectedUnit, setSelectedUnit] = useState<HardwareUnit>(activeUnit || units[1] || units[0]);
+  const [isBuying, setIsBuying] = useState(false);
+  const [buySuccess, setBuySuccess] = useState(false);
 
   const isOpen = activeModal === "gallery";
   if (!isOpen) return null;
+
+  const priceETH = hardwarePrices[selectedUnit.serialNumber] || 0.05;
+  const isOwnedByUser = userWallet.ownedTokens.includes(selectedUnit.tokenId);
+
+  const handleBuy = () => {
+    setIsBuying(true);
+    setTimeout(() => {
+      purchaseHardware(selectedUnit.tokenId, selectedUnit.serialNumber, selectedUnit.modelName, priceETH);
+      setIsBuying(false);
+      setBuySuccess(true);
+    }, 1000);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-2xl animate-in fade-in duration-200 select-none">
@@ -89,14 +108,14 @@ export default function HardwareGalleryModal() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-black text-white">Hardware Gallery & Digital Twins</h2>
+                <h2 className="text-base font-black text-white">Hardware Marketplace & Showroom</h2>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center gap-1">
-                  <ShieldCheck size={11} />
-                  <span>On-Chain Verified Catalog</span>
+                  <Coins size={11} />
+                  <span>Wallet: {userWallet.balanceETH} ETH</span>
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-mono">
-                Explore Multi-Component Hardware Provenance & Live Warranty Lifecycles
+                Explore Multi-Component Hardware Provenance & Autonomous On-Chain Purchases
               </p>
             </div>
           </div>
@@ -113,30 +132,39 @@ export default function HardwareGalleryModal() {
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Left Category Selector Strip */}
           <div className="w-full md:w-[260px] border-b md:border-b-0 md:border-r border-white/10 bg-slate-950/60 p-4 flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto">
-            {units.map((u) => (
-              <button
-                key={u.tokenId}
-                onClick={() => {
-                  setSelectedUnit(u);
-                  setActiveUnit(u);
-                }}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-1 shrink-0 md:shrink group ${
-                  selectedUnit.tokenId === u.tokenId
-                    ? "bg-emerald-500/20 border-emerald-400 shadow-lg"
-                    : "bg-white/5 border-white/10 hover:bg-white/10"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white group-hover:text-emerald-300 truncate">
-                    {u.modelName}
-                  </span>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-slate-300">
-                    {u.category}
-                  </span>
-                </div>
-                <p className="text-[10px] font-mono text-amber-300">{u.serialNumber}</p>
-              </button>
-            ))}
+            {units.map((u) => {
+              const p = hardwarePrices[u.serialNumber] || 0.05;
+              const isOwned = userWallet.ownedTokens.includes(u.tokenId);
+
+              return (
+                <button
+                  key={u.tokenId}
+                  onClick={() => {
+                    setSelectedUnit(u);
+                    setActiveUnit(u);
+                    setBuySuccess(false);
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-1 shrink-0 md:shrink group ${
+                    selectedUnit.tokenId === u.tokenId
+                      ? "bg-emerald-500/20 border-emerald-400 shadow-lg"
+                      : "bg-white/5 border-white/10 hover:bg-white/10"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white group-hover:text-emerald-300 truncate max-w-[140px]">
+                      {u.modelName}
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-slate-300">
+                      {p} ETH
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] font-mono">
+                    <span className="text-amber-300">{u.serialNumber}</span>
+                    {isOwned && <span className="text-purple-300 font-bold">OWNED</span>}
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {/* Center 3D Model Display */}
@@ -158,7 +186,7 @@ export default function HardwareGalleryModal() {
               <OrbitControls enablePan={true} enableZoom={true} minDistance={2} maxDistance={10} />
             </Canvas>
 
-            {/* Floating Model Badge */}
+            {/* Floating Model Badge & Buy Bar */}
             <div className="absolute bottom-4 left-6 right-6 p-3.5 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/15 shadow-xl flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-white">{selectedUnit.modelName}</p>
@@ -166,9 +194,28 @@ export default function HardwareGalleryModal() {
                   {selectedUnit.manufacturer} • Token #{selectedUnit.tokenId}
                 </p>
               </div>
-              <span className="text-xs font-mono font-bold text-emerald-400 px-2.5 py-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40">
-                {selectedUnit.warrantyMonths}m Official Warranty
-              </span>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono font-bold text-amber-300 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30">
+                  {priceETH} ETH
+                </span>
+
+                {isOwnedByUser || buySuccess ? (
+                  <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-purple-500/25 border border-purple-400 text-purple-300 flex items-center gap-1.5">
+                    <CheckCircle2 size={13} />
+                    <span>In Your Bag</span>
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleBuy}
+                    disabled={isBuying}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs transition-all shadow-lg active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <ShoppingBag size={13} />
+                    <span>{isBuying ? "Mining..." : "Buy NFT"}</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

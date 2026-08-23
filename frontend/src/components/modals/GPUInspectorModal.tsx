@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useMemo, Suspense } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Float, Html, useGLTF } from "@react-three/drei";
+import { OrbitControls, Float } from "@react-three/drei";
 import * as THREE from "three";
 import {
   X,
@@ -13,14 +13,15 @@ import {
   Cpu,
   CheckCircle2,
   ExternalLink,
-  Info,
+  Coins,
   Sparkles,
-  Search,
-  Maximize2,
-  RotateCcw,
+  ShoppingBag,
+  ArrowRight,
+  ShieldAlert,
 } from "lucide-react";
 import { THEME } from "@/theme/designSystem";
 import { useHardwareStore, HardwareUnit } from "@/store/hardwareStore";
+import { useBlockchainEngine } from "@/store/blockchainEngine";
 
 /* ───────────────────────────────────────────
    Interactive 3D Exploded RTX 3090 GPU Assembly
@@ -256,9 +257,13 @@ function ExplodedGPUModel({
 
 export default function GPUInspectorModal() {
   const { activeModal, setActiveModal, activeUnit, units } = useHardwareStore();
+  const { purchaseHardware, userWallet, hardwarePrices } = useBlockchainEngine();
+
   const [explodeFactor, setExplodeFactor] = useState(0.45);
   const [selectedPart, setSelectedPart] = useState<string | null>("cooling_fan");
   const [activeTab, setActiveTab] = useState<"inspector" | "provenance" | "ipfs">("inspector");
+  const [isBuying, setIsBuying] = useState(false);
+  const [buySuccess, setBuySuccess] = useState(false);
 
   const isOpen = activeModal === "gpu_inspector";
   const unit: HardwareUnit =
@@ -268,9 +273,21 @@ export default function GPUInspectorModal() {
 
   if (!isOpen) return null;
 
+  const priceETH = hardwarePrices[unit.serialNumber] || 0.45;
+  const isOwnedByUser = userWallet.ownedTokens.includes(unit.tokenId);
+
   const hasFanReplacement = unit.repairHistory.some(
     (r) => r.componentName === "cooling_fan" && r.isReplaced
   );
+
+  const handleBuy = () => {
+    setIsBuying(true);
+    setTimeout(() => {
+      purchaseHardware(unit.tokenId, unit.serialNumber, unit.modelName, priceETH);
+      setIsBuying(false);
+      setBuySuccess(true);
+    }, 1000);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-2xl animate-in fade-in duration-200 select-none">
@@ -295,6 +312,11 @@ export default function GPUInspectorModal() {
                   <CheckCircle2 size={11} />
                   <span>ERC-721 Token #{unit.tokenId}</span>
                 </span>
+                {isOwnedByUser && (
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300">
+                    OWNED BY YOU
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 font-mono">
                 Serial: <span className="text-amber-300 font-bold">{unit.serialNumber}</span> •{" "}
@@ -404,8 +426,53 @@ export default function GPUInspectorModal() {
             </div>
           </div>
 
-          {/* Right Sidebar: Sub-Component Provenance & Alerts */}
+          {/* Right Sidebar: Sub-Component Provenance & Purchase Action */}
           <div className="w-full md:w-[380px] border-t md:border-t-0 md:border-l border-white/10 bg-slate-950/70 backdrop-blur-xl p-5 flex flex-col overflow-y-auto space-y-4">
+            {/* Autonomous Purchase Card */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-950/40 to-slate-900/60 border border-purple-500/30 space-y-3 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block">
+                    Autonomous On-Chain Price
+                  </span>
+                  <p className="text-lg font-black text-white font-mono flex items-center gap-1.5">
+                    <Coins className="w-4 h-4 text-amber-400" />
+                    <span>{priceETH} ETH</span>
+                    <span className="text-xs font-normal text-slate-400">($1,450 USD)</span>
+                  </p>
+                </div>
+
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
+                  Instant Mint & Transfer
+                </span>
+              </div>
+
+              {buySuccess || isOwnedByUser ? (
+                <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 size={16} />
+                  <span>You Own This Physical Hardware NFT!</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleBuy}
+                  disabled={isBuying}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isBuying ? (
+                    <>
+                      <Sparkles size={14} className="animate-spin" />
+                      <span>Mining Purchase Block...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag size={14} />
+                      <span>Purchase & Claim NFT ({priceETH} ETH)</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
             {/* Quick Component Selection Pills */}
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
@@ -463,7 +530,7 @@ export default function GPUInspectorModal() {
                     <p className="font-bold text-amber-300">Center Axial Cooling Fan Assembly</p>
                     <p className="text-[11px] text-slate-400 mt-1">
                       Serviced 45 days ago at CyberService Hub #04. Replaced with OEM dual-ball
-                      bearing unit. Verified with cryptographic signature on Polygon Amoy.
+                      bearing unit. Verified on Sovereign HardWAve Blockchain.
                     </p>
                     <div className="mt-2.5 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] font-mono text-amber-200">
                       IPFS CID: QmYwAPJzv5CZsn...
@@ -481,24 +548,6 @@ export default function GPUInspectorModal() {
               </div>
             </div>
 
-            {/* On-Chain Specs Matrix */}
-            <div className="space-y-2">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Factory Specifications
-              </p>
-              <div className="space-y-1.5 text-xs font-mono">
-                {Object.entries(unit.specs).map(([key, val]) => (
-                  <div
-                    key={key}
-                    className="flex justify-between py-1 px-2.5 rounded-lg bg-white/5 border border-white/5"
-                  >
-                    <span className="text-slate-400">{key}</span>
-                    <span className="text-white font-bold">{val}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* Smart Contract Hash */}
             <div className="pt-2 border-t border-white/10 text-[10px] font-mono text-slate-400 space-y-1">
               <div className="flex justify-between">
@@ -506,8 +555,10 @@ export default function GPUInspectorModal() {
                 <span className="text-emerald-400 font-bold">0xHardWAve...Token</span>
               </div>
               <div className="flex justify-between">
-                <span>Tx Hash</span>
-                <span className="text-slate-300 truncate max-w-[180px]">{unit.txHash}</span>
+                <span>Owner</span>
+                <span className="text-slate-300 truncate max-w-[180px]">
+                  {isOwnedByUser ? userWallet.address : unit.manufacturerAddress}
+                </span>
               </div>
             </div>
           </div>

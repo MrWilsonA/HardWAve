@@ -14,12 +14,17 @@ import {
   Sparkles,
   CloudRain,
   CloudSun,
+  Coins,
+  ShoppingBag,
+  Boxes,
 } from "lucide-react";
 import HardWAveLogo from "@/components/ui/HardWAveLogo";
 import SoundController from "@/components/ui/SoundController";
 import { STATIONS, StationDef, StationIcon } from "@/components/3d/nature/ParkPavilions";
 import { DayNightState } from "@/hooks/useDayNightCycle";
 import { THEME } from "@/theme/designSystem";
+import { useBlockchainEngine } from "@/store/blockchainEngine";
+import { useHardwareStore } from "@/store/hardwareStore";
 
 interface NavbarProps {
   dayNight: DayNightState;
@@ -29,111 +34,90 @@ interface NavbarProps {
 }
 
 export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 }: NavbarProps) {
-  const [connected, setConnected] = useState(false);
-  const [account, setAccount] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(false);
   const [showFastTravel, setShowFastTravel] = useState(false);
 
   const { timeString, isNight, progress } = dayNight;
-
-  const toggleConnect = () => {
-    if (!connected) {
-      setConnected(true);
-      setAccount("0x71C...4a9B");
-    } else {
-      setConnected(false);
-      setAccount(null);
-    }
-  };
+  const { userWallet } = useBlockchainEngine();
+  const { setActiveModal } = useHardwareStore();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 select-none p-3 pointer-events-none">
-      <div className="w-full flex items-center justify-between pointer-events-auto px-1">
-        {/* ── Top Left: HardWAve Logo + Compact Day/Night Clock (Directly in Corner) ── */}
-        <div className="flex items-center gap-3">
-          <Link href="/" className="transition-transform active:scale-95">
-            <HardWAveLogo size={40} />
-          </Link>
-
-          {/* Compact Minimal Clock Widget */}
-          <div
-            className="hidden sm:flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border shadow-xl transition-all"
+      <div className="flex items-center justify-between gap-3">
+        {/* ── Left Corner: HardWAve Logo + Live Real-Time Clock ── */}
+        <div className="flex items-center gap-2.5 pointer-events-auto shrink-0">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 p-1.5 pr-3.5 rounded-2xl border transition-all duration-300 shadow-xl group cursor-pointer active:scale-95"
             style={{
-              background: THEME.colors.glass.bg,
-              borderColor: isNight ? "rgba(167, 139, 250, 0.3)" : THEME.colors.glass.borderGold,
+              background: THEME.colors.glass.bgElevated,
+              borderColor: THEME.colors.glass.border,
               backdropFilter: THEME.colors.glass.backdropBlur,
               boxShadow: THEME.colors.glass.shadow,
             }}
           >
-            <div
-              className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors"
-              style={{
-                background: isNight
-                  ? "linear-gradient(135deg, rgba(30, 27, 75, 0.9), rgba(49, 46, 129, 0.9))"
-                  : "linear-gradient(135deg, rgba(180, 83, 9, 0.8), rgba(245, 158, 11, 0.9))",
-                border: `1px solid ${isNight ? "rgba(167, 139, 250, 0.4)" : "rgba(251, 191, 36, 0.5)"}`,
-              }}
-            >
-              {isNight ? (
-                <Moon className="w-3.5 h-3.5 text-indigo-300" />
-              ) : (
-                <Sun className="w-3.5 h-3.5 text-amber-300 animate-spin-slow" />
-              )}
+            <div className="transition-transform duration-300 group-hover:scale-105">
+              <HardWAveLogo size={36} />
             </div>
+            <div className="hidden sm:block">
+              <span className="text-sm font-black tracking-wider text-white">HardWAve</span>
+              <span className="block text-[8px] font-mono tracking-widest text-emerald-400 font-bold uppercase -mt-1">
+                Hardware Provenance
+              </span>
+            </div>
+          </Link>
 
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-mono font-black tracking-wider text-white">
-                  {timeString}
-                </span>
-                <span
-                  className="text-[9px] uppercase font-bold tracking-wider"
-                  style={{ color: isNight ? "#a78bfa" : "#fbbf24" }}
-                >
-                  {isNight ? "Night" : "Day"}
-                </span>
-              </div>
-              {/* Micro Progress Bar */}
-              <div className="w-16 rounded-full h-1 overflow-hidden bg-black/40 mt-0.5">
-                <div
-                  className="h-full rounded-full transition-all duration-300"
-                  style={{
-                    width: `${(progress * 100).toFixed(0)}%`,
-                    background: "linear-gradient(90deg, #10b981, #fbbf24, #8b5cf6)",
-                  }}
-                />
-              </div>
-            </div>
+          {/* 10-Minute Cycle Living World Clock */}
+          <div
+            className="px-3 py-2 rounded-2xl border flex items-center gap-2 shadow-xl"
+            style={{
+              background: THEME.colors.glass.bgElevated,
+              borderColor: isNight ? "rgba(147, 197, 253, 0.25)" : "rgba(251, 191, 36, 0.25)",
+              backdropFilter: THEME.colors.glass.backdropBlur,
+              boxShadow: THEME.colors.glass.shadow,
+            }}
+          >
+            {isNight ? (
+              <Moon className="w-4 h-4 text-blue-300 animate-pulse" />
+            ) : (
+              <Sun className="w-4 h-4 text-amber-400 animate-spin" style={{ animationDuration: "20s" }} />
+            )}
+            <span
+              className="text-xs font-mono font-black tracking-wider"
+              style={{ color: isNight ? "#93c5fd" : "#fbbf24" }}
+            >
+              {timeString}
+            </span>
           </div>
         </div>
 
-        {/* ── Top Right: Minimized Icon Controls & Wallet ── */}
-        <div className="flex items-center gap-2.5 relative">
-          {/* 1. Controls Guide Icon Button (Left of Fast Travel) */}
+        {/* ── Right Corner: Controls, Fast Travel, Weather, Audio & Sovereign Web3 Wallet ── */}
+        <div className="flex items-center gap-2 pointer-events-auto shrink-0">
+          {/* 1. Minimized Controls Icon Button */}
           <div className="relative">
             <button
               onClick={() => {
                 setShowControls(!showControls);
-                if (showFastTravel) setShowFastTravel(false);
+                setShowFastTravel(false);
               }}
-              className="w-10 h-10 rounded-2xl border flex items-center justify-center transition-all shadow-xl active:scale-90 cursor-pointer"
+              className="w-10 h-10 rounded-2xl border flex items-center justify-center transition-all shadow-xl active:scale-90 cursor-pointer text-slate-300 hover:text-white"
               style={{
                 background: showControls
-                  ? "linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(6, 78, 59, 0.95))"
+                  ? "linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(180, 83, 9, 0.8))"
                   : THEME.colors.glass.bg,
-                borderColor: showControls ? "#4ade80" : THEME.colors.glass.border,
+                borderColor: showControls ? "#fbbf24" : THEME.colors.glass.border,
                 backdropFilter: THEME.colors.glass.backdropBlur,
-                color: showControls ? "#4ade80" : "#cbd5e1",
+                color: showControls ? "#fbbf24" : "#cbd5e1",
               }}
-              title="Drive Controls Guide"
+              title="Controls & Instructions"
             >
               <Gamepad2 className="w-5 h-5" />
             </button>
 
-            {/* Controls Floating Card */}
+            {/* Controls Popover */}
             {showControls && (
               <div
-                className="absolute top-12 right-0 w-[230px] p-4 rounded-3xl border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 select-none"
+                className="absolute top-12 right-0 w-72 p-4 rounded-3xl border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 select-none space-y-3"
                 style={{
                   background: THEME.colors.glass.bgElevated,
                   borderColor: THEME.colors.glass.border,
@@ -141,82 +125,79 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
                   boxShadow: THEME.colors.glass.shadow,
                 }}
               >
-                <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Navigation className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-black uppercase tracking-wider text-white">
-                      Controls Guide
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-white">
+                    Buggy Controls
+                  </span>
+                  <span className="text-[9px] font-mono text-emerald-400 font-bold">ARCADE PHYSICS</span>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400">Drive Forward</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white/10 font-mono text-[11px] text-amber-300 font-bold border border-white/15">
+                      W / ↑
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400">Steer Left / Right</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white/10 font-mono text-[11px] text-amber-300 font-bold border border-white/15">
+                      A / D / ← →
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400">Reverse / Brake</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white/10 font-mono text-[11px] text-amber-300 font-bold border border-white/15">
+                      S / ↓
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400">Inspect Station</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white/10 font-mono text-[11px] text-emerald-400 font-bold border border-white/15">
+                      E
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400">Rotate Camera</span>
+                    <span className="text-[10px] font-mono text-slate-400 font-bold">
+                      Left Drag
                     </span>
                   </div>
-                  <button
-                    onClick={() => setShowControls(false)}
-                    className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1.5 w-[96px] mx-auto my-2">
-                  <div />
-                  <kbd className="rounded-xl text-center text-xs py-1.5 font-mono font-bold bg-white/10 border border-white/20 text-white shadow-inner">
-                    W
-                  </kbd>
-                  <div />
-                  {["A", "S", "D"].map((key) => (
-                    <kbd
-                      key={key}
-                      className="rounded-xl text-center text-xs py-1.5 font-mono font-bold bg-white/10 border border-white/20 text-white shadow-inner"
-                    >
-                      {key}
-                    </kbd>
-                  ))}
-                </div>
-
-                <div className="space-y-1.5 text-[10px] font-mono text-slate-300 mt-3 pt-2 border-t border-white/10">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Handbrake</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-bold border border-white/15">
-                      SPACE
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">360° Orbit</span>
-                    <span className="text-emerald-400 font-bold">Hold Drag</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Zoom Cam</span>
-                    <span className="text-emerald-400 font-bold">Scroll Wheel</span>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400">Zoom Camera</span>
+                    <span className="text-[10px] font-mono text-slate-400 font-bold">
+                      Scroll Wheel
+                    </span>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* 2. Fast Travel Icon Button */}
+          {/* 2. Fast Travel Popover */}
           <div className="relative">
             <button
               onClick={() => {
                 setShowFastTravel(!showFastTravel);
-                if (showControls) setShowControls(false);
+                setShowControls(false);
               }}
-              className="w-10 h-10 rounded-2xl border flex items-center justify-center transition-all shadow-xl active:scale-90 cursor-pointer"
+              className="w-10 h-10 rounded-2xl border flex items-center justify-center transition-all shadow-xl active:scale-90 cursor-pointer text-slate-300 hover:text-white"
               style={{
                 background: showFastTravel
-                  ? "linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(6, 78, 59, 0.95))"
+                  ? "linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(3, 105, 161, 0.8))"
                   : THEME.colors.glass.bg,
-                borderColor: showFastTravel ? "#4ade80" : THEME.colors.glass.border,
+                borderColor: showFastTravel ? "#38bdf8" : THEME.colors.glass.border,
                 backdropFilter: THEME.colors.glass.backdropBlur,
-                color: showFastTravel ? "#4ade80" : "#cbd5e1",
+                color: showFastTravel ? "#38bdf8" : "#cbd5e1",
               }}
-              title="Fast Travel Menu"
+              title="Fast Travel to Pavilions"
             >
               <Compass className="w-5 h-5" />
             </button>
 
-            {/* Fast Travel Floating Drawer */}
             {showFastTravel && (
               <div
-                className="absolute top-12 right-0 w-[240px] p-3 rounded-3xl border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 select-none space-y-1.5"
+                className="absolute top-12 right-0 w-72 p-3 rounded-3xl border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 select-none space-y-1.5"
                 style={{
                   background: THEME.colors.glass.bgElevated,
                   borderColor: THEME.colors.glass.border,
@@ -224,59 +205,37 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
                   boxShadow: THEME.colors.glass.shadow,
                 }}
               >
-                <div className="flex items-center justify-between px-2 py-1 border-b border-white/10 mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <Compass className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-black uppercase tracking-wider text-white">
-                      Fast Travel
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setShowFastTravel(false)}
-                    className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
+                <div className="flex items-center justify-between px-2 py-1 border-b border-white/10 mb-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-white">
+                    Fast Travel GPS
+                  </span>
+                  <span className="text-[9px] font-mono text-cyan-400 font-bold">5 STATIONS</span>
                 </div>
 
-                {STATIONS.map((station) => {
-                  const isActive = activeStation?.id === station.id;
-                  return (
-                    <button
-                      key={station.id}
-                      onClick={() => {
-                        onTeleport(station.id);
-                        setShowFastTravel(false);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs font-semibold transition-all text-left active:scale-95 group cursor-pointer"
+                {STATIONS.map((station) => (
+                  <button
+                    key={station.id}
+                    onClick={() => {
+                      onTeleport(station.id);
+                      setShowFastTravel(false);
+                    }}
+                    className="w-full p-2.5 rounded-2xl text-left transition-all border flex items-center gap-2.5 group cursor-pointer hover:scale-102 bg-white/5 border-white/10 text-slate-200 hover:bg-white/10"
+                  >
+                    <div
+                      className="w-7 h-7 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
                       style={{
-                        borderLeft: `3px solid ${station.color}`,
-                        color: isActive ? station.color : "#e2e8f0",
-                        background: isActive ? `${station.color}25` : "rgba(255, 255, 255, 0.03)",
+                        background: `${station.color}20`,
+                        border: `1px solid ${station.color}40`,
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = `${station.color}15`)}
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = isActive
-                          ? `${station.color}25`
-                          : "rgba(255, 255, 255, 0.03)")
-                      }
                     >
-                      <div
-                        className="w-7 h-7 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
-                        style={{
-                          background: `${station.color}20`,
-                          border: `1px solid ${station.color}40`,
-                        }}
-                      >
-                        <StationIcon name={station.iconName} size={14} color={station.color} />
-                      </div>
-                      <div className="truncate">
-                        <p className="font-bold text-[11px] leading-tight">{station.label}</p>
-                        <p className="text-[9px] text-slate-400 truncate">{station.description}</p>
-                      </div>
-                    </button>
-                  );
-                })}
+                      <StationIcon name={station.iconName} size={14} color={station.color} />
+                    </div>
+                    <div className="truncate">
+                      <p className="font-bold text-[11px] leading-tight">{station.label}</p>
+                      <p className="text-[9px] text-slate-400 truncate">{station.description}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -310,27 +269,25 @@ export default function Navbar({ dayNight, activeStation, onTeleport, speed = 0 
             onToggleRain={dayNight.toggleRain}
           />
 
-          {/* 5. Connect Wallet Button */}
+          {/* 5. Sovereign Web3 Wallet & Block Graph Button */}
           <button
-            onClick={toggleConnect}
+            onClick={() => setActiveModal("vault_mint")}
             className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-xl active:scale-95 group cursor-pointer"
             style={{
-              background: connected
-                ? "linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(6, 78, 59, 0.9))"
-                : "linear-gradient(135deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.95))",
-              border: `1px solid ${connected ? "rgba(74, 222, 128, 0.5)" : "rgba(255, 255, 255, 0.12)"}`,
+              background: "linear-gradient(135deg, rgba(147, 51, 234, 0.35), rgba(79, 70, 229, 0.9))",
+              border: "1px solid rgba(168, 85, 247, 0.5)",
               color: "#f8fafc",
               backdropFilter: "blur(16px)",
-              boxShadow: THEME.colors.glass.shadow,
+              boxShadow: "0 8px 24px rgba(147, 51, 234, 0.3)",
             }}
+            title="Open Sovereign Blockchain Graph & Wallet"
           >
-            {connected ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <Wallet className="w-4 h-4 text-amber-400 group-hover:rotate-12 transition-transform" />
-            )}
-            <span className="font-mono tracking-wide hidden md:inline">
-              {connected ? account : "Connect"}
+            <Coins className="w-4 h-4 text-amber-300 animate-pulse" />
+            <span className="font-mono font-bold tracking-wide">
+              {userWallet.balanceETH} ETH
+            </span>
+            <span className="hidden sm:inline text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-purple-200">
+              {userWallet.ownedTokens.length} NFTs
             </span>
           </button>
         </div>
