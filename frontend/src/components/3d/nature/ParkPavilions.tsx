@@ -21,42 +21,42 @@ export interface StationDef {
 
 export const STATIONS: StationDef[] = [
   {
-    id: "gpu",
+    id: "gpu_lab",
     label: "GPU Inspection Lab",
     iconName: "gpu",
     position: [-16, 0, -16],
     modelPath: "/models/gpu.glb",
-    targetSize: 1.7,
+    targetSize: 1.65,
     color: "#f87171",
     description: "RTX 3090 3D Digital Twin & Exploded Assembly",
   },
   {
-    id: "blockchain",
+    id: "blockchain_vault",
     label: "Blockchain Vault",
     iconName: "blockchain",
     position: [20, 0, -16],
     modelPath: "/models/ssd.glb",
-    targetSize: 1.6,
+    targetSize: 1.5,
     color: "#a78bfa",
     description: "Samsung NVMe M.2 SSD • ERC-721 Hardware Ledger",
   },
   {
-    id: "service",
+    id: "service_workshop",
     label: "Service Workshop",
     iconName: "service",
     position: [-18, 0, 18],
     modelPath: "/models/fan.glb",
-    targetSize: 1.6,
+    targetSize: 1.15, // Reduced cooling fan size as requested!
     color: "#fbbf24",
     description: "RGB Cooling Fan • Maintenance & Thermal Logs",
   },
   {
-    id: "scanner",
+    id: "qr_gate",
     label: "QR Scanner Gate",
     iconName: "scanner",
     position: [0, 0, -25],
     modelPath: "/models/ram.glb",
-    targetSize: 1.65,
+    targetSize: 1.5,
     color: "#34d399",
     description: "HyperX DDR4 RAM Module • Barcode & Serial Registry",
   },
@@ -66,7 +66,7 @@ export const STATIONS: StationDef[] = [
     iconName: "showroom",
     position: [22, 0, 18],
     modelPath: "/models/motherboard.glb",
-    targetSize: 1.8,
+    targetSize: 1.7,
     color: "#38bdf8",
     description: "NZXT Z490 Motherboard Architecture Showcase",
   },
@@ -118,14 +118,14 @@ function PavilionPedestal({
       {/* Multi-tiered Stone Plinth */}
       <mesh position={[0, 0.15, 0]} receiveShadow castShadow>
         <cylinderGeometry args={[4.2, 4.6, 0.3, 8]} />
-        <meshStandardMaterial color="#78716c" flatShading roughness={0.85} />
+        <meshStandardMaterial color="#374151" flatShading roughness={0.9} />
       </mesh>
       <mesh position={[0, 0.35, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[3.6, 4.0, 0.2, 8]} />
-        <meshStandardMaterial color="#a8a29e" flatShading roughness={0.8} />
+        <cylinderGeometry args={[3.2, 3.5, 0.2, 8]} />
+        <meshStandardMaterial color="#4b5563" flatShading roughness={0.85} />
       </mesh>
 
-      {/* Glowing Neon Ring on Floor */}
+      {/* Cyber Neon Floor Inlay Ring */}
       <mesh ref={ringRef} position={[0, 0.46, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[2.2, 2.35, 32]} />
         <meshStandardMaterial
@@ -245,9 +245,9 @@ function PavilionPedestal({
               <p className="text-[11px] text-slate-300 font-medium">
                 {station.description}
               </p>
-              <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-mono text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-md border border-amber-500/30">
+              <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-mono text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-md border border-amber-500/30 font-bold">
                 <Sparkles size={11} className="text-amber-400" />
-                <span>Enter Zone to Trigger</span>
+                <span>Press E or Click Banner to Inspect</span>
               </span>
             </div>
           </div>
@@ -261,7 +261,7 @@ function PavilionPedestal({
    Auto-Normalizing GLTF Hardware Model
    – Computes accurate 3D bounding box
    – Wraps in isolated container & centers geometry perfectly to (0, 0, 0)
-   – Normalizes max dimension to targetSize (1.6m - 1.8m)
+   – Normalizes max dimension to targetSize
    – Sets double-sided materials & crisp shadow casting
    ─────────────────────────────────────────── */
 function NormalizedGLBModel({ path, targetSize = 1.65 }: { path: string; targetSize?: number }) {
@@ -318,15 +318,15 @@ function NormalizedGLBModel({ path, targetSize = 1.65 }: { path: string; targetS
   );
 }
 
-/* Procedural Holographic CPU Chip (Fallback / Loading State) */
-function ProceduralHardwareHologram({ color }: { color: string }) {
+/* Fallback Holographic CPU Chip while loading GLTF */
+function ProceduralHardwareHologram({ color = "#38bdf8" }: { color?: string }) {
   return (
-    <Float speed={3} rotationIntensity={0.4} floatIntensity={0.5}>
-      <group rotation={[0.3, 0, 0]}>
-        {/* PCB Board Base */}
-        <mesh castShadow receiveShadow>
+    <Float speed={3} rotationIntensity={0.6} floatIntensity={0.8}>
+      <group>
+        {/* Silicon Substrate Base */}
+        <mesh castShadow>
           <boxGeometry args={[1.2, 0.08, 1.2]} />
-          <meshStandardMaterial color="#064e3b" roughness={0.6} metalness={0.4} />
+          <meshStandardMaterial color="#022c22" roughness={0.4} metalness={0.8} />
         </mesh>
         {/* Metallic Heat Spreader IHS */}
         <mesh position={[0, 0.08, 0]} castShadow>
@@ -367,7 +367,7 @@ export default function ParkPavilions({
     const dx = buggyPosition.x - station.position[0];
     const dz = buggyPosition.z - station.position[2];
     const dist = Math.sqrt(dx * dx + dz * dz);
-    const isNear = dist < 7.5;
+    const isNear = dist < 8.8; // Generous trigger zone
 
     if (isNear && activeStation.current !== station.id) {
       activeStation.current = station.id;
