@@ -19,10 +19,10 @@ import RedBuggy from "@/components/3d/nature/RedBuggy";
 import ParkPavilions, { STATIONS } from "@/components/3d/nature/ParkPavilions";
 import Navbar from "@/components/ui/Navbar";
 import NatureHUD from "@/components/ui/NatureHUD";
-import IntroOverlay from "@/components/ui/IntroOverlay";
 import CustomCursor from "@/components/ui/CustomCursor";
 import { useDayNightCycle } from "@/hooks/useDayNightCycle";
 import { useHardwareStore, ModalId } from "@/store/hardwareStore";
+import { useBlockchainEngine } from "@/store/blockchainEngine";
 import { useWorldTelemetry } from "@/store/worldTelemetry";
 
 // Web3 & blockchain interactive modals
@@ -31,6 +31,7 @@ import BlockchainVaultModal from "@/components/modals/BlockchainVaultModal";
 import ServiceWorkshopModal from "@/components/modals/ServiceWorkshopModal";
 import QRScannerModal from "@/components/modals/QRScannerModal";
 import HardwareGalleryModal from "@/components/modals/HardwareGalleryModal";
+import TutorialModal from "@/components/modals/TutorialModal";
 
 /** Which pavilion opens which Web3 experience. */
 const STATION_MODALS: Record<string, ModalId> = {
@@ -41,12 +42,13 @@ const STATION_MODALS: Record<string, ModalId> = {
   showroom: "gallery",
 };
 
-export default function Home() {
-  const [teleportTarget, setTeleportTarget] = useState<THREE.Vector3 | null>(null);
+export default function NatureIslandPage() {
+  const dayNight = useDayNightCycle();
+  const { isNight, isRaining, lampIntensityMultiplier } = dayNight;
 
-  // 10-minute real-time day/night cycle
-  const dayNight = useDayNightCycle(1.0);
-  const { lampIntensityMultiplier, isNight, isRaining } = dayNight;
+  const [teleportTarget, setTeleportTarget] = useState<THREE.Vector3 | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const nearStationId = useWorldTelemetry((s) => s.nearStationId);
   const activeStation = useMemo(
@@ -66,6 +68,24 @@ export default function Home() {
 
   const handleTeleportDone = useCallback(() => setTeleportTarget(null), []);
 
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2400);
+  }, []);
+
+  // Quick reset buggy to central rotary spawn point
+  const handleResetVehicle = useCallback(() => {
+    setTeleportTarget(new THREE.Vector3(0, 0.5, 14.0));
+    showToast("🏎️ Posisi Mobil Berhasil Direset ke Pusat Pulau!");
+  }, [showToast]);
+
+  // Full reset blockchain and hardware state
+  const handleResetBlockchain = useCallback(() => {
+    useBlockchainEngine.getState().resetChain();
+    useHardwareStore.getState().resetRegistry();
+    showToast("⚡ Seluruh Data Blockchain & Game Berhasil Direset!");
+  }, [showToast]);
+
   // Open the pavilion's corresponding Web3 modal
   const handleStationInteract = useCallback(() => {
     if (!activeStation) return;
@@ -79,23 +99,28 @@ export default function Home() {
     if (modal) setActiveModal(modal);
   }, [activeStation, setActiveModal, setActiveUnit, units]);
 
-  // 'E' opens the nearby station; 'Escape' closes whatever is open.
+  // 'E' opens station; 'R' resets buggy; 'Escape' closes modals
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && activeModal) {
-        setActiveModal(null);
+      if (e.key === "Escape") {
+        if (activeModal) setActiveModal(null);
+        if (showTutorial) setShowTutorial(false);
         return;
       }
       const typing = (e.target as HTMLElement | null)?.tagName;
       if (typing === "INPUT" || typing === "TEXTAREA" || typing === "SELECT") return;
 
-      if ((e.key === "e" || e.key === "E") && activeStation && !activeModal) {
+      if ((e.key === "e" || e.key === "E") && activeStation && !activeModal && !showTutorial) {
         handleStationInteract();
+      }
+
+      if ((e.key === "r" || e.key === "R") && !activeModal && !showTutorial) {
+        handleResetVehicle();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeStation, activeModal, handleStationInteract, setActiveModal]);
+  }, [activeStation, activeModal, showTutorial, handleStationInteract, setActiveModal, handleResetVehicle]);
 
   // The static island only needs rebuilding when the lamps change brightness,
   // not on every clock tick, so it is memoized against that single value.
@@ -121,21 +146,34 @@ export default function Home() {
       {/* Sleek custom indie-metaverse cursor */}
       <CustomCursor />
 
-      {/* Header: logo & world clock on the left, controls, fast travel and wallet on the right */}
-      <Navbar dayNight={dayNight} onTeleport={handleTeleport} />
+      {/* Header: logo & world clock on the left; tutorial, reset, controls, fast travel and wallet on the right */}
+      <Navbar
+        dayNight={dayNight}
+        onTeleport={handleTeleport}
+        onOpenTutorial={() => setShowTutorial(true)}
+        onResetVehicle={handleResetVehicle}
+      />
 
-      {/* Speedometer, GPS radar mini-map and the interactive station card */}
+      {/* Speedometer, quick tutorial/reset pill, GPS radar mini-map and interactive station card */}
       <NatureHUD
         activeStation={activeStation}
         onTeleport={handleTeleport}
         onInteract={handleStationInteract}
+        onOpenTutorial={() => setShowTutorial(true)}
+        onResetVehicle={handleResetVehicle}
       />
+
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none select-none">
+          <div className="px-5 py-2.5 rounded-2xl bg-black/80 backdrop-blur-xl border border-amber-500/40 text-amber-300 text-xs font-bold shadow-2xl flex items-center gap-2">
+            <span>{toastMessage}</span>
+          </div>
+        </div>
+      )}
 
       {/* 3D canvas world */}
       <Canvas
-        // three r185 deprecated PCFSoftShadowMap and silently downgrades it to
-        // PCFShadowMap, warning on every shadow recompile. Ask for the real
-        // type directly: identical output, no console spam.
         shadows="percentage"
         camera={{ position: [0, 10.5, 15.5], fov: 48, near: 0.5, far: 3500 }}
         dpr={[1, 1.5]}
@@ -169,7 +207,7 @@ export default function Home() {
             teleportTo={teleportTarget}
             onTeleportDone={handleTeleportDone}
             lampMultiplier={lampIntensityMultiplier}
-            controlsEnabled={!activeModal}
+            controlsEnabled={!activeModal && !showTutorial}
           />
 
           {/* Golden fireflies by day, starlight motes at night */}
@@ -178,8 +216,7 @@ export default function Home() {
             scale={45}
             size={isNight ? 4.5 : 3.0}
             speed={0.5}
-            color={isNight ? "#60a5fa" : "#fbbf24"}
-            opacity={isNight ? 0.75 : 0.45}
+            color={isNight ? "#38bdf8" : "#fbbf24"}
           />
 
           {/* Soft ground contact ambient occlusion */}
@@ -219,7 +256,13 @@ export default function Home() {
       <QRScannerModal />
       <HardwareGalleryModal />
 
-      <IntroOverlay />
+      {/* ── Interactive Tutorial & Reset Modal ── */}
+      <TutorialModal
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        onResetVehicle={handleResetVehicle}
+        onResetBlockchain={handleResetBlockchain}
+      />
     </main>
   );
 }

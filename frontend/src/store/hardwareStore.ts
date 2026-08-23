@@ -211,6 +211,7 @@ interface HardwareStoreState {
     serialNumber: string,
     repair: Omit<RepairRecord, "repairId" | "timestamp">
   ) => boolean;
+  resetRegistry: () => void;
 }
 
 export const useHardwareStore = create<HardwareStoreState>()(
@@ -295,6 +296,13 @@ export const useHardwareStore = create<HardwareStoreState>()(
 
         return true;
       },
+
+      resetRegistry: () =>
+        set({
+          units: INITIAL_HARDWARE_UNITS,
+          activeUnit: INITIAL_HARDWARE_UNITS[0],
+          activeModal: null,
+        }),
     }),
     {
       name: "hardwave-hardware-registry",

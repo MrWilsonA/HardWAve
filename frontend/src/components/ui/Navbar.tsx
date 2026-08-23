@@ -2,7 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Gamepad2, Compass, Sun, Moon, CloudRain, CloudSun, Coins } from "lucide-react";
+import {
+  Gamepad2,
+  Compass,
+  Sun,
+  Moon,
+  CloudRain,
+  CloudSun,
+  Coins,
+  BookOpen,
+  RotateCcw,
+} from "lucide-react";
 import HardWAveLogo from "@/components/ui/HardWAveLogo";
 import SoundController from "@/components/ui/SoundController";
 import { STATIONS, StationIcon } from "@/components/3d/nature/ParkPavilions";
@@ -14,9 +24,16 @@ import { useHardwareStore } from "@/store/hardwareStore";
 interface NavbarProps {
   dayNight: DayNightState;
   onTeleport: (stationId: string) => void;
+  onOpenTutorial?: () => void;
+  onResetVehicle?: () => void;
 }
 
-export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
+export default function Navbar({
+  dayNight,
+  onTeleport,
+  onOpenTutorial,
+  onResetVehicle,
+}: NavbarProps) {
   const [showControls, setShowControls] = useState(false);
   const [showFastTravel, setShowFastTravel] = useState(false);
 
@@ -83,7 +100,10 @@ export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
             {isNight ? (
               <Moon className="w-4 h-4 text-blue-300 animate-pulse" />
             ) : (
-              <Sun className="w-4 h-4 text-amber-400 animate-spin" style={{ animationDuration: "20s" }} />
+              <Sun
+                className="w-4 h-4 text-amber-400 animate-spin"
+                style={{ animationDuration: "20s" }}
+              />
             )}
             <span
               className="text-xs font-mono font-black tracking-wider"
@@ -94,9 +114,31 @@ export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
           </div>
         </div>
 
-        {/* ── Right Corner: Controls, Fast Travel, Weather, Audio & Sovereign Web3 Wallet ── */}
+        {/* ── Right Corner: Tutorial, Reset, Controls, Fast Travel, Weather, Audio & Wallet ── */}
         <div className="flex items-center gap-2 pointer-events-auto shrink-0">
-          {/* 1. Minimized Controls Icon Button */}
+          {/* 1. Tutorial & Guide Button */}
+          {onOpenTutorial && (
+            <button
+              onClick={onOpenTutorial}
+              className="w-10 h-10 rounded-2xl border flex items-center justify-center transition-all shadow-xl active:scale-90 cursor-pointer bg-black/50 hover:bg-amber-500/25 border-amber-500/30 hover:border-amber-400 text-amber-300 hover:text-amber-200 backdrop-blur-xl"
+              title="Panduan Tutorial HardWAve"
+            >
+              <BookOpen className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* 2. Reset Buggy Button */}
+          {onResetVehicle && (
+            <button
+              onClick={onResetVehicle}
+              className="w-10 h-10 rounded-2xl border flex items-center justify-center transition-all shadow-xl active:scale-90 cursor-pointer bg-black/50 hover:bg-purple-500/25 border-purple-500/30 hover:border-purple-400 text-purple-300 hover:text-purple-200 backdrop-blur-xl"
+              title="Reset Posisi Mobil (Shortcut: R)"
+            >
+              <RotateCcw className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* 3. Minimized Controls Icon Button */}
           <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
             <button
               onClick={() => {
@@ -132,7 +174,9 @@ export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
                   <span className="text-xs font-black uppercase tracking-wider text-white">
                     Buggy Controls
                   </span>
-                  <span className="text-[9px] font-mono text-emerald-400 font-bold">ARCADE PHYSICS</span>
+                  <span className="text-[9px] font-mono text-emerald-400 font-bold">
+                    ARCADE PHYSICS
+                  </span>
                 </div>
 
                 <div className="space-y-2 text-xs">
@@ -151,7 +195,7 @@ export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
                   <div className="flex justify-between items-center text-slate-300">
                     <span className="text-slate-400">Reverse / Brake</span>
                     <kbd className="px-2 py-0.5 rounded bg-white/10 font-mono text-[11px] text-amber-300 font-bold border border-white/15">
-                      S / ↓
+                      S / ↓ / Spasi
                     </kbd>
                   </div>
                   <div className="flex justify-between items-center text-slate-300">
@@ -161,10 +205,14 @@ export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
                     </kbd>
                   </div>
                   <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-slate-400">Reset Car</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white/10 font-mono text-[11px] text-purple-300 font-bold border border-white/15">
+                      R
+                    </kbd>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
                     <span className="text-slate-400">Rotate Camera</span>
-                    <span className="text-[10px] font-mono text-slate-400 font-bold">
-                      Left Drag
-                    </span>
+                    <span className="text-[10px] font-mono text-slate-400 font-bold">Left Drag</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-300">
                     <span className="text-slate-400">Zoom Camera</span>
@@ -177,7 +225,7 @@ export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
             )}
           </div>
 
-          {/* 2. Fast Travel Popover */}
+          {/* 4. Fast Travel Popover */}
           <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
             <button
               onClick={() => {
@@ -243,7 +291,7 @@ export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
             )}
           </div>
 
-          {/* 3. Rain & Weather Toggle Quick Button */}
+          {/* 5. Rain & Weather Toggle Quick Button */}
           <button
             onClick={dayNight.toggleRain}
             className="w-10 h-10 rounded-2xl border flex items-center justify-center transition-all shadow-xl active:scale-90 cursor-pointer"
@@ -264,14 +312,14 @@ export default function Navbar({ dayNight, onTeleport }: NavbarProps) {
             )}
           </button>
 
-          {/* 4. Sound & BGM Settings Icon Button */}
+          {/* 6. Sound & BGM Settings Icon Button */}
           <SoundController
             isNight={dayNight.isNight}
             isRaining={dayNight.isRaining}
             onToggleRain={dayNight.toggleRain}
           />
 
-          {/* 5. Sovereign Web3 Wallet & Block Graph Button */}
+          {/* 7. Sovereign Web3 Wallet & Block Graph Button */}
           <button
             onClick={() => setActiveModal("vault_mint")}
             className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-xl active:scale-95 group cursor-pointer"

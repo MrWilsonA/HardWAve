@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Gauge, Zap, MapPin, Sparkles } from "lucide-react";
+import { Gauge, Zap, MapPin, Sparkles, BookOpen, RotateCcw } from "lucide-react";
 import { STATIONS, StationDef, StationIcon } from "@/components/3d/nature/ParkPavilions";
 import { THEME } from "@/theme/designSystem";
 import { useWorldTelemetry } from "@/store/worldTelemetry";
@@ -10,6 +10,8 @@ interface NatureHUDProps {
   activeStation: StationDef | null;
   onTeleport: (stationId: string) => void;
   onInteract?: () => void;
+  onOpenTutorial?: () => void;
+  onResetVehicle?: () => void;
 }
 
 // Mini-map coordinate mapping (world radius 48m onto a 120px radar)
@@ -17,7 +19,13 @@ const MAP_SIZE = 120;
 const MAP_RADIUS = MAP_SIZE / 2;
 const MAP_SCALE = (MAP_RADIUS - 10) / 48;
 
-export default function NatureHUD({ activeStation, onTeleport, onInteract }: NatureHUDProps) {
+export default function NatureHUD({
+  activeStation,
+  onTeleport,
+  onInteract,
+  onOpenTutorial,
+  onResetVehicle,
+}: NatureHUDProps) {
   // Telemetry is mirrored at ~10 Hz, so the HUD stays live without pulling the
   // whole page into the 60 fps render loop.
   const x = useWorldTelemetry((s) => s.x);
@@ -33,10 +41,36 @@ export default function NatureHUD({ activeStation, onTeleport, onInteract }: Nat
 
   return (
     <>
-      {/* ── Bottom Left: Speedometer & Telemetry ── */}
-      <div className="fixed bottom-6 left-4 z-30 select-none pointer-events-none">
+      {/* ── Bottom Left: Speedometer, Telemetry & Quick Action Pill ── */}
+      <div className="fixed bottom-6 left-4 z-30 select-none pointer-events-none flex flex-col gap-2">
+        {/* Quick Tutorial & Reset Buttons Bar */}
+        <div className="flex items-center gap-2 pointer-events-auto">
+          {onOpenTutorial && (
+            <button
+              onClick={onOpenTutorial}
+              className="px-3 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold transition-all shadow-xl active:scale-95 cursor-pointer bg-black/60 hover:bg-black/80 text-amber-300 border-amber-500/40 hover:border-amber-400 backdrop-blur-xl"
+              title="Buka Panduan Tutorial Lengkap"
+            >
+              <BookOpen size={13} className="text-amber-400" />
+              <span>Tutorial</span>
+            </button>
+          )}
+
+          {onResetVehicle && (
+            <button
+              onClick={onResetVehicle}
+              className="px-3 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold transition-all shadow-xl active:scale-95 cursor-pointer bg-black/60 hover:bg-black/80 text-purple-300 border-purple-500/40 hover:border-purple-400 backdrop-blur-xl"
+              title="Reset Mobil ke Pusat (Shortcut: R)"
+            >
+              <RotateCcw size={13} className="text-purple-400" />
+              <span>Reset (R)</span>
+            </button>
+          )}
+        </div>
+
+        {/* Speedometer Card */}
         <div
-          className="rounded-2xl p-3 border flex items-center gap-3 shadow-2xl"
+          className="rounded-2xl p-3 border flex items-center gap-3 shadow-2xl pointer-events-auto"
           style={{
             background: THEME.colors.glass.bgElevated,
             borderColor: THEME.colors.glass.border,
@@ -48,52 +82,32 @@ export default function NatureHUD({ activeStation, onTeleport, onInteract }: Nat
             <span className="text-2xl font-mono font-black tracking-tighter text-amber-300">
               {Math.abs(Math.round(speed))}
             </span>
-            <span className="block text-[9px] font-bold uppercase -mt-1 text-slate-400 font-mono">
-              km/h
+            <span className="block text-[8px] font-mono text-slate-400 -mt-1 tracking-widest font-bold">
+              KM/H
             </span>
           </div>
 
-          <div className="h-8 w-px bg-white/15" />
+          <div className="w-[1px] h-7 bg-white/10" />
 
-          <div>
+          <div className="space-y-0.5 text-slate-400 text-[10px] font-mono">
             <div className="flex items-center gap-1.5">
-              <span
-                className="inline-flex items-center gap-1 text-[10px] font-black font-mono px-2 py-0.5 rounded-md"
-                style={{
-                  background: speed > 0.5 ? "rgba(34, 197, 94, 0.2)" : "rgba(251, 191, 36, 0.2)",
-                  border: `1px solid ${speed > 0.5 ? "rgba(74, 222, 128, 0.4)" : "rgba(251, 191, 36, 0.4)"}`,
-                  color: speed > 0.5 ? "#4ade80" : "#fbbf24",
-                }}
-              >
-                {speed > 0.5 ? (
-                  <>
-                    <Zap size={11} /> DRIVE
-                  </>
-                ) : (
-                  <>
-                    <Gauge size={11} /> PARK
-                  </>
-                )}
-              </span>
+              <Zap size={11} className="text-amber-400" />
+              <span>RWD Buggy</span>
             </div>
-            {/* Speed Bar */}
-            <div className="w-18 h-1.5 rounded-full mt-1.5 overflow-hidden bg-black/40">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${Math.min(100, (Math.abs(speed) / 14) * 100)}%`,
-                  background: "linear-gradient(90deg, #10b981, #fbbf24)",
-                }}
-              />
+            <div className="flex items-center gap-1.5">
+              <Gauge size={11} className="text-emerald-400" />
+              <span className="text-[9px]">
+                X: {x.toFixed(1)} Z: {z.toFixed(1)}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Bottom Right: GPS Radar Mini-Map ── */}
-      <div className="fixed bottom-6 right-4 z-30 select-none">
+      {/* ── Bottom Right: Circular Mini-Map Radar ── */}
+      <div className="fixed bottom-6 right-4 z-30 select-none pointer-events-auto">
         <div
-          className="rounded-3xl p-3 border shadow-2xl relative"
+          className="rounded-3xl p-2 border shadow-2xl relative overflow-hidden"
           style={{
             background: THEME.colors.glass.bgElevated,
             borderColor: THEME.colors.glass.border,
@@ -101,86 +115,75 @@ export default function NatureHUD({ activeStation, onTeleport, onInteract }: Nat
             boxShadow: THEME.colors.glass.shadow,
           }}
         >
-          <div className="text-[10px] font-mono font-bold mb-1.5 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-emerald-400">
-              <MapPin size={12} />
-              <span>GPS Radar</span>
-            </span>
-            <span className="text-[9px] text-slate-400">Tap to Jump</span>
-          </div>
-
-          {/* Circular Radar Container */}
           <div
-            className="w-[120px] h-[120px] rounded-full relative overflow-hidden shadow-inner cursor-pointer"
+            className="relative rounded-2xl overflow-hidden border border-white/10"
             style={{
-              background: "radial-gradient(circle at center, #064e3b 0%, #022c22 80%, #0f172a 100%)",
-              border: "2px solid rgba(74, 222, 128, 0.35)",
-            }}
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const clickX = e.clientX - rect.left - mapRadius;
-              const clickY = e.clientY - rect.top - mapRadius;
-              const worldX = clickX / mapScale;
-              const worldZ = clickY / mapScale;
-              let closest = STATIONS[0];
-              let minDist = 999;
-              STATIONS.forEach((s) => {
-                const d = Math.sqrt((s.position[0] - worldX) ** 2 + (s.position[2] - worldZ) ** 2);
-                if (d < minDist) {
-                  minDist = d;
-                  closest = s;
-                }
-              });
-              onTeleport(closest.id);
+              width: `${mapSize}px`,
+              height: `${mapSize}px`,
+              background: "radial-gradient(circle, #064e3b 0%, #022c22 75%, #0f172a 100%)",
             }}
           >
-            {/* Radar sweep lines */}
-            <div className="absolute inset-0 border border-emerald-500/15 rounded-full pointer-events-none" />
-            <div className="absolute inset-4 border border-emerald-500/20 rounded-full pointer-events-none" />
-
-            {/* Lake shape on radar */}
+            {/* Grand Boulevard Ring */}
             <div
-              className="absolute rounded-full"
-              style={{
-                left: `${mapRadius + 14 * mapScale - 10}px`,
-                top: `${mapRadius + 0 * mapScale - 10}px`,
-                width: "20px",
-                height: "20px",
-                background: "rgba(56, 189, 248, 0.35)",
-                border: "1px solid rgba(56, 189, 248, 0.5)",
-              }}
-            />
-
-            {/* Grand Ring Road indicator */}
-            <div
-              className="absolute rounded-full pointer-events-none"
+              className="absolute rounded-full border border-amber-400/25 pointer-events-none"
               style={{
                 left: `${mapRadius - 25 * mapScale}px`,
                 top: `${mapRadius - 25 * mapScale}px`,
                 width: `${50 * mapScale}px`,
                 height: `${50 * mapScale}px`,
-                border: "1px dashed rgba(251, 191, 36, 0.3)",
               }}
             />
 
-            {/* Center Grand Oak tree node */}
+            {/* Central Rotary */}
             <div
-              className="absolute w-2.5 h-2.5 rounded-full -translate-x-1/2 -translate-y-1/2"
+              className="absolute rounded-full border border-amber-400/40 pointer-events-none"
               style={{
-                left: `${mapRadius}px`,
-                top: `${mapRadius}px`,
-                background: "#4ade80",
-                boxShadow: "0 0 6px #4ade80",
+                left: `${mapRadius - 6.5 * mapScale}px`,
+                top: `${mapRadius - 6.5 * mapScale}px`,
+                width: `${13 * mapScale}px`,
+                height: `${13 * mapScale}px`,
               }}
             />
 
-            {/* Station Nodes */}
+            {/* Cross Roads */}
+            <div
+              className="absolute bg-amber-400/15 pointer-events-none"
+              style={{
+                left: `${mapRadius - 1.2}px`,
+                top: "6px",
+                width: "2.4px",
+                height: `${mapSize - 12}px`,
+              }}
+            />
+            <div
+              className="absolute bg-amber-400/15 pointer-events-none"
+              style={{
+                top: `${mapRadius - 1.2}px`,
+                left: "6px",
+                height: "2.4px",
+                width: `${mapSize - 12}px`,
+              }}
+            />
+
+            {/* East Lake (center: 14, 0, radius: 6.0) */}
+            <div
+              className="absolute rounded-full bg-cyan-500/40 border border-cyan-400/50 pointer-events-none"
+              style={{
+                left: `${mapRadius + 14 * mapScale - 6 * mapScale}px`,
+                top: `${mapRadius - 6 * mapScale}px`,
+                width: `${12 * mapScale}px`,
+                height: `${12 * mapScale}px`,
+              }}
+            />
+
+            {/* 5 Hardware Pavilion Dots */}
             {STATIONS.map((s) => {
               const sx = mapRadius + s.position[0] * mapScale;
               const sy = mapRadius + s.position[2] * mapScale;
               return (
                 <div
                   key={s.id}
+                  onClick={() => onTeleport(s.id)}
                   className="absolute w-2.5 h-2.5 rounded-full -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-150"
                   style={{
                     left: `${sx}px`,
