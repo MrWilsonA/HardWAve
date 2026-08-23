@@ -155,11 +155,16 @@ export default function NatureLighting({ dayNight }: NatureLightingProps) {
       <fog
         attach="fog"
         args={[
-          fogColor,
-          dayNight.isRaining ? 16 : 65,
-          dayNight.isRaining ? 135 : 480,
+          dayNight.fogColor,
+          dayNight.fogNear,
+          dayNight.fogFar,
         ]}
       />
+
+      {/* Dynamic Rain Overcast Sky Backdrop */}
+      {dayNight.isRaining && (
+        <color attach="background" args={[dayNight.fogColor]} />
+      )}
     </>
   );
 }

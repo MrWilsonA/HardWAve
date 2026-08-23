@@ -18,6 +18,8 @@ export interface DayNightState {
   ambientIntensity: number;
   ambientColor: string;
   fogColor: string;
+  fogNear: number;
+  fogFar: number;
   skyRayleigh: number;
   skyTurbidity: number;
   lampIntensityMultiplier: number;
@@ -71,20 +73,24 @@ export function useDayNightCycle(customSpeedMultiplier: number = 1): DayNightSta
   const isNight = sunY < 2;
 
   // Day / Night interpolated parameters
-  let sunIntensity = Math.max(0, (sunY / sunRadius) * (isRaining ? 1.4 : 2.8));
+  let sunIntensity = Math.max(0, (sunY / sunRadius) * (isRaining ? 1.2 : 2.8));
   let ambientIntensity = isRaining ? 0.45 : 0.65;
-  let ambientColor = isRaining ? "#cbd5e1" : "#fff1d6";
-  let fogColor = isRaining ? "#64748b" : "#fbd38d";
+  let ambientColor = isRaining ? "#94a3b8" : "#fff1d6";
+  let fogColor = isRaining ? "#475569" : "#cbd5e1";
+  let fogNear = isRaining ? 5 : 20;
+  let fogFar = isRaining ? 52 : 220;
   let skyRayleigh = isRaining ? 5.5 : 2.2;
   let skyTurbidity = isRaining ? 18 : 8;
   let lampIntensityMultiplier = isRaining ? 1.6 : 0.3;
 
   if (sunY < 10 && sunY >= -5) {
     // Sunset / Golden Hour / Twilight
-    sunIntensity = isRaining ? 0.6 : 1.2;
+    sunIntensity = isRaining ? 0.5 : 1.2;
     ambientIntensity = isRaining ? 0.35 : 0.5;
-    ambientColor = isRaining ? "#94a3b8" : "#fca5a5";
-    fogColor = isRaining ? "#475569" : "#d97706";
+    ambientColor = isRaining ? "#64748b" : "#fca5a5";
+    fogColor = isRaining ? "#334155" : "#d97706";
+    fogNear = isRaining ? 5 : 15;
+    fogFar = isRaining ? 50 : 180;
     skyRayleigh = isRaining ? 6.0 : 4.5;
     skyTurbidity = 14;
     lampIntensityMultiplier = 2.0;
@@ -93,7 +99,9 @@ export function useDayNightCycle(customSpeedMultiplier: number = 1): DayNightSta
     sunIntensity = 0;
     ambientIntensity = isRaining ? 0.16 : 0.22;
     ambientColor = isRaining ? "#0f172a" : "#1e1b4b";
-    fogColor = isRaining ? "#020617" : "#0f172a";
+    fogColor = isRaining ? "#090d16" : "#0f172a";
+    fogNear = isRaining ? 5 : 15;
+    fogFar = isRaining ? 48 : 170;
     skyRayleigh = 0.3;
     skyTurbidity = 4;
     lampIntensityMultiplier = 3.8;
@@ -111,6 +119,8 @@ export function useDayNightCycle(customSpeedMultiplier: number = 1): DayNightSta
     ambientIntensity,
     ambientColor,
     fogColor,
+    fogNear,
+    fogFar,
     skyRayleigh,
     skyTurbidity,
     lampIntensityMultiplier,

@@ -122,6 +122,22 @@ export default function RedBuggy({
     };
   }, [gl]);
 
+  // ── Dynamic Vehicle Engine Drive Sound ──
+  const driveAudioRef = useRef<HTMLAudioElement | null>(null);
+  const engineVolumeRef = useRef<number>(0.0);
+
+  useEffect(() => {
+    const audio = new Audio("/audio/drive.mp3");
+    audio.loop = true;
+    audio.volume = 0.0;
+    driveAudioRef.current = audio;
+
+    return () => {
+      audio.pause();
+      audio.src = "";
+    };
+  }, []);
+
   // Handle teleport
   const prevTeleport = useRef<THREE.Vector3 | null>(null);
   if (teleportTo && teleportTo !== prevTeleport.current) {
@@ -235,6 +251,26 @@ export default function RedBuggy({
     // Visual front wheel turning
     if (wheelFLRef.current) wheelFLRef.current.rotation.y = -s.steerAngle * 0.35;
     if (wheelFRRef.current) wheelFRRef.current.rotation.y = -s.steerAngle * 0.35;
+
+    // ── Dynamic Engine Audio Fade & Pitch Modulation ──
+    const audio = driveAudioRef.current;
+    if (audio) {
+      const targetVol = absSpeed > 0.25 ? Math.min(0.24, (absSpeed / MAX_SPEED) * 0.24) : 0.0;
+      engineVolumeRef.current = THREE.MathUtils.lerp(engineVolumeRef.current, targetVol, 10 * dt);
+
+      if (engineVolumeRef.current > 0.002) {
+        if (audio.paused) {
+          audio.play().catch(() => {});
+        }
+        audio.volume = Math.max(0, Math.min(1, engineVolumeRef.current));
+        audio.playbackRate = 0.85 + (absSpeed / MAX_SPEED) * 0.45;
+      } else {
+        audio.volume = 0;
+        if (!audio.paused) {
+          audio.pause();
+        }
+      }
+    }
 
     // ── Smooth Interactive Orbital Camera Follow ──
     const orb = orbitState.current;
